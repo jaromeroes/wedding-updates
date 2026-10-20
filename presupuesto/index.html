@@ -155,6 +155,8 @@ h1,h2,h3{margin:0;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
 .tag.cash{background:var(--cash-bg);color:var(--cash-ink)}
 .tag.banco{background:var(--bank-bg);color:var(--bank-ink)}
 .tag.fam{background:var(--brand-soft);color:var(--brand)}
+.tag.mix{background:linear-gradient(90deg,var(--cash-bg) 50%,var(--bank-bg) 50%);color:var(--ink)}
+.cname .t .tag,.gname .tag{margin-left:8px;vertical-align:1px;font-size:11.5px;padding:2px 8px;font-weight:600}
 .tags{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
 .rtotal{display:flex;justify-content:space-between;padding:12px 18px;font-weight:700}
 .empty{padding:34px 18px;text-align:center;color:var(--muted)}
@@ -539,6 +541,19 @@ form.edit input,form.edit select{background:var(--surface)}
   }
   const pbar = (p, c) => { const done = c > 0 && p >= c - 0.5; return `<span class="pbar${done ? ' ok' : ''}"><i style="width:${c ? Math.min(p / c, 1) * 100 : 0}%"></i></span>`; };
 
+  // forma de pago: la marcada en la partida, o la que sale de sus movimientos (cash, banco o ambos = mixto)
+  function pagoDe(r){
+    if (['cash', 'banco', 'mixto'].includes(r.pago)) return r.pago;
+    let c = 0, b = 0;
+    S.movs.forEach(m => { if (m.partidaId === r.id) m.metodo === 'cash' ? c += +m.importe || 0 : b += +m.importe || 0; });
+    return c > 0 && b > 0 ? 'mixto' : c > 0 ? 'cash' : b > 0 ? 'banco' : '';
+  }
+  function pagoCat(items){
+    const set = new Set(items.map(pagoDe).filter(Boolean));
+    return set.has('mixto') || (set.has('cash') && set.has('banco')) ? 'mixto' : [...set][0] || '';
+  }
+  const pagoTag = p => p === 'mixto' ? '<span class="tag mix">Mixto</span>' : p === 'cash' ? '<span class="tag cash">Cash</span>' : p === 'banco' ? '<span class="tag banco">Banco</span>' : '';
+
   // ---------- render ----------
   function render(){
     const ready = S.loaded.p && S.loaded.m && S.loaded.r;
@@ -575,9 +590,15 @@ form.edit input,form.edit select{background:var(--surface)}
 
   function renderCats(C){
     if (!C.catList.length) { $('catTable').innerHTML = `<div class="empty">Aún no hay partidas. Añádelas en Partidas.</div>`; return; }
+    // how each category has been paid: cash, banco or both
+    const catOf = {}; C.catList.forEach(c => c.items.forEach(r => catOf[r.id] = c.nombre));
+    const met = {};
+    S.movs.forEach(m => { const c = catOf[m.partidaId]; if (!c) return; const o = met[c] ||= { cash: 0, banco: 0 }; o[m.metodo === 'cash' ? 'cash' : 'banco'] += +m.importe || 0; });
+    const metTag = n => pagoTag(pagoCat((C.catList.find(c => c.nombre === n) || { items: [] }).items));
+    const mixLine = n => { const o = met[n]; return o && o.cash > 0 && o.banco > 0 ? ` · ${fmt(o.cash)} cash + ${fmt(o.banco)} banco` : ''; };
     $('catTable').innerHTML = `<div class="lhead"><span>Categoría</span><span class="r hide-m">Previsto</span><span class="r hide-m">Pagado</span><span class="r">Pendiente</span></div>` +
       C.catList.map(c => `<button class="crow" type="button" data-goto="${esc(c.nombre)}">
-        <span class="cname"><span class="t">${esc(c.nombre)}</span><span class="s">${c.items.length} ${c.items.length === 1 ? 'partida' : 'partidas'}<span class="show-m" style="display:inline"> · ${esc(fmt(c.pagado))} de ${esc(fmt(c.coste))}</span></span>${pbar(c.pagado, c.coste)}</span>
+        <span class="cname"><span class="t">${esc(c.nombre)}${metTag(c.nombre)}</span><span class="s">${c.items.length} ${c.items.length === 1 ? 'partida' : 'partidas'}${esc(mixLine(c.nombre))}<span class="show-m" style="display:inline"> · ${esc(fmt(c.pagado))} de ${esc(fmt(c.coste))}</span></span>${pbar(c.pagado, c.coste)}</span>
         <span class="cnum num hide-m">${fmt(c.coste)}</span>
         <span class="cnum num hide-m">${fmt(c.pagado)}</span>
         ${pill(c)}</button>`).join('') +
@@ -665,6 +686,7 @@ form.edit input,form.edit select{background:var(--surface)}
     {name:'proveedor', label:'Proveedor'},
     {name:'previsto', label:'Previsto (€)', type:'number'},
     {name:'final', label:'Precio final (€)', type:'number', ph:'Sin cerrar'},
+    {name:'pago', label:'Forma de pago', type:'select', options: v => [['', 'Según los pagos'], ['cash', 'Cash'], ['banco', 'Banco'], ['mixto', 'Mixto']].map(([k, l]) => `<option value="${k}"${(v || '') === k ? ' selected' : ''}>${l}</option>`).join('')},
     {name:'notas', label:'Notas', span:true},
   ];
 
@@ -706,14 +728,14 @@ form.edit input,form.edit select{background:var(--surface)}
       C.catList.map(c => {
         const open = !S.collapsed.has(c.nombre);
         return `<div id="g-${slug(c.nombre)}"><button class="ghead" type="button" data-toggle="${esc(c.nombre)}" aria-expanded="${open}">
-          <span class="gname">${CARET}<span>${esc(c.nombre)}</span></span>
+          <span class="gname">${CARET}<span>${esc(c.nombre)}</span>${pagoTag(pagoCat(c.items))}</span>
           <span class="cnum num hide-m">${fmt(c.coste)}</span><span class="cnum num hide-m">${fmt(c.pagado)}</span>${pill(c)}</button>` +
           (open ? c.items.map(r => {
             const path = 'partidas/' + r.id;
             if (S.editing === path) return editBlock(path, PAR_FIELDS, !hasMov.has(r.id), 'Tiene movimientos: bórralos antes para poder borrar la partida.');
             const sub = [r.proveedor, r.notas].filter(Boolean).join(' · ');
             return `<button class="lrow" type="button" data-row="${esc(path)}">
-              <span class="cname"><span class="t">${esc(r.nombre)}</span>${sub ? `<span class="s">${esc(sub)}</span>` : ''}<span class="s show-m">${esc(fmt(r.pagado))} de ${esc(fmt(r.coste))}${r.final != null && r.final !== '' ? ' (final)' : ''}</span>${pbar(r.pagado, r.coste)}</span>
+              <span class="cname"><span class="t">${esc(r.nombre)}${pagoTag(pagoDe(r))}</span>${sub ? `<span class="s">${esc(sub)}</span>` : ''}<span class="s show-m">${esc(fmt(r.pagado))} de ${esc(fmt(r.coste))}${r.final != null && r.final !== '' ? ' (final)' : ''}</span>${pbar(r.pagado, r.coste)}</span>
               <span class="cnum num hide-m">${fmt(r.coste)}${r.final != null && r.final !== '' ? '<small>precio final</small>' : ''}</span>
               <span class="cnum num hide-m">${fmt(r.pagado)}</span>
               ${pill(r)}</button>`;
@@ -777,7 +799,7 @@ form.edit input,form.edit select{background:var(--surface)}
   const DIFF = {
     movimiento: { partidaId: ['partida', v => partidaName(v)], importe: ['importe', v => fmt2(v)], fecha: ['mes', fDate], metodo: ['cómo', metodoTxt], pagador: ['quién paga', v => v || '—'], nota: ['nota', v => v || '—'] },
     regalo: { de: ['de parte de', v => v || '—'], importe: ['importe', v => fmt2(v)], fecha: ['mes', fDate], metodo: ['cómo', metodoTxt], adultos: ['adultos', v => v ?? '—'], ninos: ['niños', v => v ?? '—'], familia: ['de los padres', v => v ? 'sí' : 'no'], nota: ['nota', v => v || '—'] },
-    partida: { nombre: ['nombre', v => v || '—'], categoria: ['categoría', v => v || '—'], proveedor: ['proveedor', v => v || '—'], previsto: ['previsto', v => fmt(v)], final: ['precio final', v => v == null || v === '' ? 'sin cerrar' : fmt(v)], notas: ['notas', v => v || '—'] },
+    partida: { nombre: ['nombre', v => v || '—'], categoria: ['categoría', v => v || '—'], proveedor: ['proveedor', v => v || '—'], previsto: ['previsto', v => fmt(v)], final: ['precio final', v => v == null || v === '' ? 'sin cerrar' : fmt(v)], notas: ['notas', v => v || '—'], pago: ['forma de pago', v => ({ cash: 'cash', banco: 'banco', mixto: 'mixto' })[v] || 'según los pagos'] },
   };
   function diffText(tipo, a, b){
     const map = DIFF[tipo] || {};
@@ -930,7 +952,7 @@ form.edit input,form.edit select{background:var(--surface)}
       upd = { fecha: d.fecha || null, de: txt('de'), importe: num('importe'), metodo: d.metodo === 'cash' ? 'cash' : 'banco', nota: txt('nota'), adultos: intOrNull(d.adultos), ninos: intOrNull(d.ninos), familia: String(d.familia) === 'true' };
       if (!upd.de || !(upd.importe > 0)) return say('Pon de quién es y un importe mayor que cero.');
     } else {
-      upd = { nombre: txt('nombre'), categoria: txt('categoria'), proveedor: txt('proveedor'), notas: txt('notas'), previsto: num('previsto') ?? 0, final: num('final') };
+      upd = { nombre: txt('nombre'), categoria: txt('categoria'), proveedor: txt('proveedor'), notas: txt('notas'), previsto: num('previsto') ?? 0, final: num('final'), pago: ['cash', 'banco', 'mixto'].includes(d.pago) ? d.pago : null };
       if (!upd.nombre) return say('La partida necesita un nombre.');
     }
     upd.editado = new Date().toISOString(); upd.editadoPor = S.uid;
