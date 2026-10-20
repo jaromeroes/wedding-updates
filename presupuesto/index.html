@@ -1,0 +1,817 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Presupuesto Jose &amp; Oarda</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500;6..96,600&family=Cormorant+Garamond:ital,wght@0,500;1,500&family=Jost:wght@400;500;600&display=swap">
+<style>
+body{margin:0}
+[hidden]{display:none!important}
+/* Layout: libro de cuentas — resumen arriba, pestañas (Resumen · Movimientos · Partidas · Regalos) debajo, una columna en móvil */
+:root{
+  --bg:#f6efe2; --surface:#fbf7ef; --ink:#2b1c1e; --muted:#6e5a55; --line:rgba(91,26,34,.16);
+  --accent:#5b1a22; --accent-ink:#fbf7ef; --accent-soft:rgba(91,26,34,.07);
+  --gold:#9a6f24; --cash:#a87a2a; --bank:#3d5a7a; --ok:#3f6b4a; --warn:#a14a2a;
+  --pend:rgba(91,26,34,.2);
+  --f-display:'Bodoni Moda','Cormorant Garamond',Georgia,serif;
+  --f-serif:'Cormorant Garamond',Garamond,Georgia,serif;
+  --f-ui:'Jost','Futura','Century Gothic','Helvetica Neue',sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#1b1314; --surface:#251a1c; --ink:#f1e6dc; --muted:#bba79e; --line:rgba(241,230,220,.13);
+  --accent:#e2a2a8; --accent-ink:#1b1314; --accent-soft:rgba(226,162,168,.09);
+  --gold:#d9b06a; --cash:#d9b06a; --bank:#93b4d9; --ok:#91c29b; --warn:#e8a07a; --pend:rgba(226,162,168,.24); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#1b1314; --surface:#251a1c; --ink:#f1e6dc; --muted:#bba79e; --line:rgba(241,230,220,.13);
+  --accent:#e2a2a8; --accent-ink:#1b1314; --accent-soft:rgba(226,162,168,.09);
+  --gold:#d9b06a; --cash:#d9b06a; --bank:#93b4d9; --ok:#91c29b; --warn:#e8a07a; --pend:rgba(226,162,168,.24); color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:15px;line-height:1.45;padding-inline:16px;padding-block:28px 64px}
+.wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+.num{font-variant-numeric:tabular-nums}
+h1,h2,h3{font-family:var(--f-display);font-weight:500;margin:0;text-wrap:balance;color:var(--accent)}
+h1{font-size:clamp(28px,5vw,40px);line-height:1.1}
+h2{font-size:22px}
+.eyebrow{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);font-weight:500}
+header{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:18px}
+header .t{display:flex;flex-direction:column;gap:6px}
+.status{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:4px 10px;border:1px solid var(--line);border-radius:999px;color:var(--muted);white-space:nowrap}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.chip.live .dot{background:var(--ok)}
+.chip.off .dot{background:var(--warn)}
+.countdown{font-family:var(--f-serif);font-style:italic;font-size:18px;color:var(--ink)}
+
+/* KPIs */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1px;background:var(--line);border:1px solid var(--line)}
+.kpi{background:var(--surface);padding:16px 18px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.kpi .v{font-size:24px;font-weight:500;letter-spacing:-.01em}
+.kpi .s{font-size:12px;color:var(--muted)}
+.kpi.hero{background:var(--accent);color:var(--accent-ink)}
+.kpi.hero .eyebrow,.kpi.hero .s{color:var(--accent-ink);opacity:.8}
+
+.budget{display:flex;flex-direction:column;gap:8px}
+.budget .row{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.track{position:relative;height:12px;background:var(--accent-soft);border-radius:2px;overflow:hidden;display:flex}
+.track i{display:block;height:100%}
+.track .paid{background:var(--accent)}
+.track .pend{background:var(--pend)}
+.track .over{background:repeating-linear-gradient(45deg,var(--warn) 0 4px,transparent 4px 8px)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:10px;height:10px;display:inline-block;border-radius:2px}
+
+/* Tabs */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tabs button{font:inherit;font-size:14px;background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);padding:10px 14px;cursor:pointer;white-space:nowrap;min-height:44px}
+.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent);font-weight:500}
+.tabs button:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.panel{display:flex;flex-direction:column;gap:24px}
+
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px}
+.box{background:var(--surface);border:1px solid var(--line);padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.box h3{font-size:17px}
+
+/* tables */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);background:var(--surface)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:500;white-space:nowrap}
+td.r,th.r{text-align:right}
+tr.cat td{background:var(--accent-soft);font-family:var(--f-display);color:var(--accent);font-size:15px}
+tr:last-child td{border-bottom:0}
+.sub{font-size:12px;color:var(--muted)}
+.bar{display:flex;height:8px;min-width:90px;background:var(--accent-soft);border-radius:2px;overflow:hidden}
+.bar i{display:block;height:100%}
+.pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.pill.cash{color:var(--cash)} .pill.banco{color:var(--bank)}
+.pill.done{color:var(--ok)} .pill.part{color:var(--gold)} .pill.none{color:var(--muted)}
+
+/* forms */
+form.add{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;align-items:end;background:var(--surface);border:1px solid var(--line);padding:16px}
+label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);min-width:0}
+input,select{font:inherit;font-size:15px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:3px;padding:9px 10px;min-height:42px;width:100%}
+input.cell{background:transparent;border-color:transparent;text-align:right;padding:6px 8px;min-height:36px;width:110px}
+input.cell:hover{border-color:var(--line)}
+.seg{display:flex;border:1px solid var(--line);border-radius:3px;overflow:hidden;min-height:42px}
+.seg label{flex:1;flex-direction:row;justify-content:center;align-items:center;cursor:pointer;font-size:14px;color:var(--ink);gap:0}
+.seg input{position:absolute;opacity:0;width:1px;height:1px}
+.seg span{padding:9px 10px;width:100%;text-align:center}
+.seg input:checked+span{background:var(--accent);color:var(--accent-ink)}
+.seg input:focus-visible+span{outline:2px solid var(--accent);outline-offset:-2px}
+.btn{font:inherit;font-size:14px;font-weight:500;background:var(--accent);color:var(--accent-ink);border:0;border-radius:3px;padding:10px 16px;min-height:42px;cursor:pointer}
+.btn.ghost{background:none;color:var(--muted);border:1px solid var(--line);font-weight:400;padding:6px 10px;min-height:34px;font-size:13px}
+.btn.ghost:hover{color:var(--warn);border-color:var(--warn)}
+.btn.danger{background:var(--warn);color:var(--accent-ink)}
+.span2{grid-column:span 2}
+@media (max-width:520px){.span2{grid-column:auto}}
+.msg{font-size:13px;color:var(--muted);min-height:1.2em}
+.empty{padding:28px;text-align:center;color:var(--muted);font-family:var(--f-serif);font-style:italic;font-size:18px}
+.split{display:flex;flex-direction:column;gap:10px}
+.split .line{display:grid;grid-template-columns:110px 1fr auto;gap:10px;align-items:center;font-size:14px}
+.split .line .bar{min-width:0}
+.big{font-size:22px;font-weight:500}
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+.filters label{min-width:160px;flex:1}
+.toggle{flex-direction:row;align-items:center;gap:10px;font-size:14px;color:var(--ink);cursor:pointer}
+.toggle input{width:20px;height:20px;min-height:0;accent-color:var(--accent);margin:0}
+.login{min-height:calc(100vh - 92px);display:flex;align-items:center;justify-content:center}
+.loginbox{width:100%;max-width:380px;display:flex;flex-direction:column;gap:14px;background:var(--surface);border:1px solid var(--line);padding:32px 28px;text-align:left}
+.loginbox h1{font-size:30px}
+.note{font-family:var(--f-serif);font-style:italic;font-size:15px;color:var(--muted)}
+tr.editing td{background:var(--accent-soft)}
+form.edit{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;align-items:end;padding-block:6px}
+form.edit .acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+td.acts-cell{white-space:nowrap}
+td.acts-cell .btn+.btn{margin-left:6px}
+</style>
+
+</head>
+<body>
+<section class="login" id="login">
+  <form class="loginbox" id="fLogin" autocomplete="on">
+    <span class="eyebrow">31 · 10 · 2026 · Granada</span>
+    <h1>Presupuesto de la boda</h1>
+    <p class="note">Jose &amp; Oarda</p>
+    <label for="lUser">Usuario<input id="lUser" name="username" autocomplete="username" required autocapitalize="none" spellcheck="false"></label>
+    <label for="lPass">Contraseña<input id="lPass" name="password" type="password" autocomplete="current-password" required></label>
+    <button class="btn" type="submit">Entrar</button>
+    <span class="msg" id="loginMsg" role="status"></span>
+  </form>
+</section>
+
+<main class="wrap" id="app" hidden>
+  <header>
+    <div class="t">
+      <span class="eyebrow">31 · 10 · 2026 · Palacio de Santa Paula, Granada</span>
+      <h1>Presupuesto de la boda</h1>
+    </div>
+    <div class="status">
+      <span class="countdown" id="countdown"></span>
+      <span class="chip" id="sync"><span class="dot"></span><span id="syncText">Conectando…</span></span>
+      <span class="chip"><span id="who"></span></span>
+      <button class="btn ghost" type="button" id="logout">Salir</button>
+    </div>
+  </header>
+
+  <section class="kpis" aria-label="Resumen">
+    <div class="kpi"><span class="eyebrow">Coste previsto</span><span class="v num" id="kCoste">—</span><span class="s" id="kCosteS">&nbsp;</span></div>
+    <div class="kpi"><span class="eyebrow">Pagado</span><span class="v num" id="kPagado">—</span><span class="s" id="kPagadoS">&nbsp;</span></div>
+    <div class="kpi"><span class="eyebrow">Falta por pagar</span><span class="v num" id="kPend">—</span><span class="s" id="kPendS">&nbsp;</span></div>
+    <div class="kpi"><span class="eyebrow">Regalos recibidos</span><span class="v num" id="kReg">—</span><span class="s" id="kRegS">&nbsp;</span></div>
+    <div class="kpi hero"><span class="eyebrow">Nos toca poner</span><span class="v num" id="kNos">—</span><span class="s">Coste previsto menos regalos</span></div>
+  </section>
+
+  <section class="budget" aria-label="Presupuesto">
+    <div class="row"><span id="bLabel">Presupuesto</span><span class="num" id="bRight"></span></div>
+    <div class="track" id="bTrack"></div>
+    <div class="legend"><span><i class="sw" style="background:var(--accent)"></i>Pagado</span><span><i class="sw" style="background:var(--pend)"></i>Pendiente</span><span><i class="sw" style="background:var(--warn)"></i>Por encima del presupuesto</span></div>
+  </section>
+
+  <nav class="tabs" role="tablist" aria-label="Secciones">
+    <button role="tab" id="t-resumen" aria-controls="p-resumen" aria-selected="true">Resumen</button>
+    <button role="tab" id="t-movs" aria-controls="p-movs" aria-selected="false">Movimientos</button>
+    <button role="tab" id="t-partidas" aria-controls="p-partidas" aria-selected="false">Partidas</button>
+    <button role="tab" id="t-regalos" aria-controls="p-regalos" aria-selected="false">Regalos</button>
+  </nav>
+
+  <!-- RESUMEN -->
+  <section class="panel" role="tabpanel" id="p-resumen" aria-labelledby="t-resumen">
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Categoría</th><th class="r">Previsto</th><th class="r">Pagado</th><th class="r">Pendiente</th><th style="width:30%">Progreso</th></tr></thead>
+      <tbody id="catBody"><tr><td colspan="5" class="empty">Cargando las cuentas…</td></tr></tbody>
+    </table></div>
+    <div class="grid2">
+      <div class="box">
+        <h3>Efectivo y banco</h3>
+        <div class="split" id="methodSplit"></div>
+        <p class="note" id="cashNote"></p>
+      </div>
+      <div class="box">
+        <h3>Deuda con Unicaja</h3>
+        <div class="split" id="unicajaSplit"></div>
+        <p class="note">Los regalos que llegan por banco van a Unicaja y se descuentan de lo que le debemos.</p>
+      </div>
+      <div class="box">
+        <h3>Quién ha pagado</h3>
+        <div class="split" id="payerSplit"></div>
+      </div>
+    </div>
+    <div class="box">
+      <h3>Copia de seguridad</h3>
+      <p class="note">Descarga todos los datos en un archivo o carga una copia. Cargar una copia sustituye las filas que tengan el mismo identificador y deja el resto como está.</p>
+      <div class="filters">
+        <button class="btn ghost" id="bkExport" type="button">Descargar copia</button>
+        <label class="btn ghost" for="bkFile" style="flex:0 0 auto;min-width:0;display:inline-flex;cursor:pointer">Cargar copia…<input type="file" id="bkFile" accept="application/json,.json" hidden></label>
+        <span id="bkConfirmWrap"></span>
+      </div>
+      <span class="msg" id="bkMsg" role="status"></span>
+    </div>
+  </section>
+
+  <!-- MOVIMIENTOS -->
+  <section class="panel" role="tabpanel" id="p-movs" aria-labelledby="t-movs" hidden>
+    <form class="add" id="fMov" autocomplete="off">
+      <label>Mes (aprox.)<select id="mFecha"></select></label>
+      <label class="span2">Partida<select id="mPartida" required></select></label>
+      <label>Importe (€)<input type="number" id="mImporte" step="0.01" min="0.01" inputmode="decimal" required placeholder="0,00"></label>
+      <div><span class="sub" style="display:block;margin-bottom:4px">Cómo</span>
+        <div class="seg" role="radiogroup" aria-label="Método de pago">
+          <label><input type="radio" name="mMetodo" id="mCash" value="cash"><span>Cash</span></label>
+          <label><input type="radio" name="mMetodo" id="mBanco" value="banco" checked><span>Banco</span></label>
+        </div></div>
+      <label>Quién paga<input id="mPagador" list="pagadores" required placeholder="Jose, Oarda…"></label>
+      <label class="span2">Nota<input id="mNota" placeholder="Señal, segundo pago…"></label>
+      <button class="btn" type="submit">Añadir movimiento</button>
+      <span class="msg" id="mMsg" role="status"></span>
+    </form>
+    <div class="filters">
+      <label>Filtrar por partida<select id="fltPartida"><option value="">Todas</option></select></label>
+      <label>Método<select id="fltMetodo"><option value="">Todos</option><option value="cash">Cash</option><option value="banco">Banco</option></select></label>
+      <label>Quién<select id="fltPagador"><option value="">Todos</option></select></label>
+    </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Mes</th><th>Partida</th><th>Quién</th><th>Cómo</th><th class="r">Importe</th><th></th></tr></thead>
+      <tbody id="movBody"><tr><td colspan="6" class="empty">Cargando movimientos…</td></tr></tbody>
+    </table></div>
+  </section>
+
+  <!-- PARTIDAS -->
+  <section class="panel" role="tabpanel" id="p-partidas" aria-labelledby="t-partidas" hidden>
+    <p class="note">Toca una cifra de «Previsto» o «Precio final» para cambiarla. El precio final, cuando lo hay, manda sobre el previsto.</p>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Partida</th><th class="r">Previsto</th><th class="r">Precio final</th><th class="r">Pagado</th><th class="r">Pendiente</th><th>Estado</th><th></th></tr></thead>
+      <tbody id="parBody"><tr><td colspan="7" class="empty">Cargando partidas…</td></tr></tbody>
+    </table></div>
+    <form class="add" id="fPar" autocomplete="off">
+      <label class="span2">Nueva partida<input id="pNombre" required placeholder="Ej. Invitaciones impresas"></label>
+      <label>Categoría<input id="pCat" list="categorias" required placeholder="Detalles y decoración"></label>
+      <label>Proveedor<input id="pProv" placeholder="Opcional"></label>
+      <label>Previsto (€)<input type="number" id="pPrev" step="0.01" min="0" inputmode="decimal" required></label>
+      <button class="btn" type="submit">Añadir partida</button>
+      <span class="msg" id="pMsg" role="status"></span>
+    </form>
+  </section>
+
+  <!-- REGALOS -->
+  <section class="panel" role="tabpanel" id="p-regalos" aria-labelledby="t-regalos" hidden>
+    <form class="add" id="fReg" autocomplete="off">
+      <label>Mes (aprox.)<select id="rFecha"></select></label>
+      <label class="span2">De parte de<input id="rDe" required placeholder="Tía Carmen y Luis"></label>
+      <label>Importe (€)<input type="number" id="rImporte" step="0.01" min="0.01" inputmode="decimal" required placeholder="0,00"></label>
+      <div><span class="sub" style="display:block;margin-bottom:4px">Cómo</span>
+        <div class="seg" role="radiogroup" aria-label="Cómo llegó el regalo">
+          <label><input type="radio" name="rMetodo" id="rCash" value="cash" checked><span>Cash</span></label>
+          <label><input type="radio" name="rMetodo" id="rBanco" value="banco"><span>Banco</span></label>
+        </div></div>
+      <label>Adultos<input type="number" id="rAdultos" min="0" step="1" inputmode="numeric" placeholder="2"></label>
+      <label>Niños<input type="number" id="rNinos" min="0" step="1" inputmode="numeric" placeholder="0"></label>
+      <label class="toggle" for="rFamilia" style="align-self:center"><input type="checkbox" id="rFamilia"> Es de los padres</label>
+      <label class="span2">Nota<input id="rNota" placeholder="Sobre en la boda, Bizum…"></label>
+      <button class="btn" type="submit">Añadir regalo</button>
+      <span class="msg" id="rMsg" role="status"></span>
+    </form>
+    <label class="toggle" for="chkFam"><input type="checkbox" id="chkFam"> Calcular sin contar los regalos de los padres (padres de Oarda y madre de Jose)</label>
+    <section class="kpis" aria-label="Regalos por persona" id="regKpis"></section>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Mes</th><th>De parte de</th><th>Personas</th><th>Cómo</th><th class="r">Importe</th><th></th></tr></thead>
+      <tbody id="regBody"><tr><td colspan="6" class="empty">Cargando regalos…</td></tr></tbody>
+    </table></div>
+  </section>
+
+  <datalist id="pagadores"></datalist>
+  <datalist id="categorias"></datalist>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="config.js"></script>
+<script>
+(() => {
+  const WEDDING = new Date('2026-10-31T12:30:00+01:00');
+  const DEFAULT_BUDGET = 30000;
+  const GIFT_CASH = 'Pagado con ingresos por regalo · cash';
+  const UNICAJA = 'Unicaja';
+  const eur = new Intl.NumberFormat('es-ES', {style:'currency', currency:'EUR', maximumFractionDigits:0});
+  const eur2 = new Intl.NumberFormat('es-ES', {style:'currency', currency:'EUR', minimumFractionDigits:2, maximumFractionDigits:2});
+  const fmt = n => eur.format(Math.round(n || 0));
+  const fmt2 = n => eur2.format(n || 0);
+  const cap = s => { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); };
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const $ = id => document.getElementById(id);
+  // Dates are tentative months of 2026, stored as "2026-MM"
+  const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const thisMonth = () => '2026-' + String(new Date().getFullYear() === 2026 ? new Date().getMonth() + 1 : 10).padStart(2, '0');
+  const fDate = s => { const m = s ? parseInt(String(s).slice(5, 7), 10) : 0; return m ? MESES[m - 1] : 'Sin mes'; };
+  const monthOptions = v => `<option value="">Sin mes</option>` + MESES.map((n, i) => { const val = '2026-' + String(i + 1).padStart(2, '0'); return `<option value="${val}"${v && String(v).slice(0, 7) === val ? ' selected' : ''}>${n}</option>`; }).join('');
+
+  const S = { partidas: [], movs: [], regalos: [], ajustes: {}, loaded: {p:false,m:false,r:false}, uid: null, names: {}, confirm: null, editing: null, draft: {} };
+  let db = null, user = null;
+
+  // countdown
+  const days = Math.ceil((WEDDING - new Date()) / 86400000);
+  $('countdown').textContent = days > 1 ? `Faltan ${days} días` : days === 1 ? 'Mañana es el día' : days === 0 ? 'Hoy es el día' : '¡Casados!';
+
+  // tabs
+  const tabs = ['resumen','movs','partidas','regalos'];
+  function showTab(name){
+    tabs.forEach(t => { $('t-'+t).setAttribute('aria-selected', String(t===name)); $('p-'+t).hidden = t!==name; });
+    try { localStorage.setItem('tab', name); } catch(e) {}
+  }
+  tabs.forEach(t => $('t-'+t).addEventListener('click', () => showTab(t)));
+  let startTab = 'resumen';
+  try { const h = location.hash.slice(1); startTab = tabs.includes(h) ? h : (localStorage.getItem('tab') || 'resumen'); } catch(e) {}
+  showTab(tabs.includes(startTab) ? startTab : 'resumen');
+
+  $('mFecha').innerHTML = monthOptions(thisMonth()); $('rFecha').innerHTML = monthOptions(thisMonth());
+
+  // ---------- derived numbers ----------
+  function compute(){
+    const paidBy = {};
+    for (const m of S.movs) paidBy[m.partidaId] = (paidBy[m.partidaId] || 0) + (+m.importe || 0);
+    const rows = S.partidas.map(p => {
+      const coste = (p.final != null && p.final !== '') ? +p.final : (+p.previsto || 0);
+      const pagado = paidBy[p.id] || 0;
+      return { ...p, coste, pagado, pendiente: Math.max(coste - pagado, 0) };
+    });
+    const cats = {};
+    for (const r of rows) {
+      const c = cats[r.categoria || 'Sin categoría'] ||= { nombre: r.categoria || 'Sin categoría', coste:0, pagado:0, pendiente:0, items:[] };
+      c.coste += r.coste; c.pagado += r.pagado; c.pendiente += r.pendiente; c.items.push(r);
+    }
+    const order = S.ajustes.categorias || [];
+    const catList = Object.values(cats).sort((a,b) => {
+      const ia = order.indexOf(a.nombre), ib = order.indexOf(b.nombre);
+      return (ia<0?99:ia) - (ib<0?99:ib) || a.nombre.localeCompare(b.nombre);
+    });
+    catList.forEach(c => c.items.sort((a,b) => (a.orden ?? 999) - (b.orden ?? 999) || a.nombre.localeCompare(b.nombre)));
+    const sum = (arr, f) => arr.reduce((s, x) => s + (+f(x) || 0), 0);
+    const coste = sum(rows, r => r.coste), pagado = sum(S.movs, m => m.importe), pendiente = sum(rows, r => r.pendiente);
+    const regalos = sum(S.regalos, r => r.importe);
+    const by = (arr, key) => arr.reduce((o, x) => (o[x[key] || '—'] = (o[x[key] || '—'] || 0) + (+x.importe || 0), o), {});
+    return { rows, catList, coste, pagado, pendiente, regalos,
+      pagMet: by(S.movs, 'metodo'), regMet: by(S.regalos, 'metodo'), pagador: by(S.movs, 'pagador'),
+      budget: +S.ajustes.presupuesto || DEFAULT_BUDGET };
+  }
+
+  // ---------- render ----------
+  function render(){
+    const ready = S.loaded.p && S.loaded.m && S.loaded.r;
+    const C = compute();
+    if (ready) {
+      $('kCoste').textContent = fmt(C.coste);
+      $('kCosteS').textContent = `${C.rows.length} partidas`;
+      $('kPagado').textContent = fmt(C.pagado);
+      $('kPagadoS').textContent = C.coste ? `${Math.round(C.pagado / C.coste * 100)} % del coste` : '';
+      $('kPend').textContent = fmt(C.pendiente);
+      $('kPendS').textContent = `${C.rows.filter(r => r.pendiente > 0.5).length} partidas con algo pendiente`;
+      $('kReg').textContent = fmt(C.regalos);
+      $('kRegS').textContent = `${S.regalos.length} ${S.regalos.length === 1 ? 'regalo' : 'regalos'}`;
+      $('kNos').textContent = fmt(C.coste - C.regalos);
+
+      const scale = Math.max(C.coste, C.budget) || 1;
+      const over = Math.max(C.coste - C.budget, 0);
+      const paidW = Math.min(C.pagado, C.coste) / scale * 100;
+      const pendW = Math.max(Math.min(C.coste, C.budget) - C.pagado, 0) / scale * 100;
+      $('bTrack').innerHTML = `<i class="paid" style="width:${paidW}%"></i><i class="pend" style="width:${pendW}%"></i><i class="over" style="width:${over/scale*100}%"></i>`;
+      $('bLabel').innerHTML = `Presupuesto <strong class="num">${fmt(C.budget)}</strong> <button class="btn ghost" id="editBudget" type="button" style="margin-left:6px">Cambiar</button>`;
+      $('bRight').textContent = over > 0 ? `${fmt(over)} por encima` : `${fmt(C.budget - C.coste)} de margen`;
+      $('bRight').style.color = over > 0 ? 'var(--warn)' : 'var(--ok)';
+      $('editBudget').onclick = editBudget;
+    }
+    renderCats(C, ready); renderSplits(C, ready); renderMovs(ready); renderPartidas(C, ready); renderRegalos(ready); renderLists(C);
+  }
+
+  function renderCats(C, ready){
+    if (!ready) return;
+    if (!C.catList.length) { $('catBody').innerHTML = `<tr><td colspan="5" class="empty">Aún no hay partidas. Añade la primera en la pestaña Partidas.</td></tr>`; return; }
+    const max = Math.max(...C.catList.map(c => Math.max(c.coste, c.pagado))) || 1;
+    $('catBody').innerHTML = C.catList.map(c => `<tr>
+      <td><strong style="font-weight:500">${esc(c.nombre)}</strong><div class="sub">${c.items.length} ${c.items.length===1?'partida':'partidas'}</div></td>
+      <td class="r num">${fmt(c.coste)}</td><td class="r num">${fmt(c.pagado)}</td>
+      <td class="r num" style="color:${c.pendiente>0.5?'var(--ink)':'var(--ok)'}">${c.pendiente>0.5?fmt(c.pendiente):'Pagado'}</td>
+      <td><div class="bar" style="width:${Math.max(c.coste,c.pagado)/max*100}%" title="${esc(fmt(c.pagado))} de ${esc(fmt(c.coste))}"><i style="width:${c.coste?Math.min(c.pagado/c.coste,1)*100:100}%;background:var(--accent)"></i><i style="flex:1;background:var(--pend)"></i></div></td>
+    </tr>`).join('') + `<tr><td><strong style="font-weight:600">Total</strong></td><td class="r num"><strong>${fmt(C.coste)}</strong></td><td class="r num"><strong>${fmt(C.pagado)}</strong></td><td class="r num"><strong>${fmt(C.pendiente)}</strong></td><td></td></tr>`;
+  }
+
+  function splitLine(label, val, max, color){
+    return `<div class="line"><span>${esc(label)}</span><div class="bar"><i style="width:${max?val/max*100:0}%;background:${color}"></i></div><span class="num">${fmt(val)}</span></div>`;
+  }
+  function renderSplits(C, ready){
+    if (!ready) return;
+    const pc = C.pagMet.cash || 0, pb = C.pagMet.banco || 0, rc = C.regMet.cash || 0, rb = C.regMet.banco || 0;
+    const max = Math.max(pc, pb, rc, rb, 1);
+    $('methodSplit').innerHTML =
+      `<span class="eyebrow">Pagos</span>` + splitLine('Cash', pc, max, 'var(--cash)') + splitLine('Banco', pb, max, 'var(--bank)') +
+      `<span class="eyebrow" style="margin-top:6px">Regalos</span>` + splitLine('Cash', rc, max, 'var(--cash)') + splitLine('Banco', rb, max, 'var(--bank)');
+    // cash gifts are spent directly ("Pagado con ingresos por regalo · cash"); bank gifts go to Unicaja
+    const giftCashSpent = C.pagador[GIFT_CASH] || 0;
+    const bal = rc - giftCashSpent;
+    $('cashNote').textContent = bal >= 0
+      ? `Efectivo de regalos: han llegado ${fmt(rc)}, se han gastado ${fmt(giftCashSpent)} y quedan ${fmt(bal)} en mano.`
+      : `Se han apuntado ${fmt(giftCashSpent)} pagados con regalos en cash, pero solo han llegado ${fmt(rc)} en regalos en cash: faltan ${fmt(-bal)} por apuntar como regalo.`;
+    const uni = C.pagador[UNICAJA] || 0, deuda = uni - rb;
+    const umax = Math.max(uni, rb, 1);
+    $('unicajaSplit').innerHTML = splitLine('Ha adelantado', uni, umax, 'var(--accent)') + splitLine('Regalos por banco', rb, umax, 'var(--bank)') +
+      `<div class="line"><span>${deuda >= 0 ? 'Le debemos' : 'A nuestro favor'}</span><span></span><span class="num big" style="color:${deuda > 0 ? 'var(--warn)' : 'var(--ok)'}">${fmt(Math.abs(deuda))}</span></div>`;
+    const payers = Object.entries(C.pagador).sort((a,b) => b[1]-a[1]);
+    const pmax = Math.max(...payers.map(p => p[1]), 1);
+    $('payerSplit').innerHTML = payers.length ? payers.map(([n,v]) => splitLine(n, v, pmax, 'var(--accent)')).join('') : '<p class="note">Todavía no hay pagos.</p>';
+  }
+
+  function partidaName(id){ const p = S.partidas.find(x => x.id === id); return p ? p.nombre : 'Partida borrada'; }
+
+  // ---------- inline editing ----------
+  // Don't redraw a table while someone is typing in it (live updates from others would steal focus).
+  function busy(col){
+    const a = document.activeElement;
+    if (!a || a === document.body) return false;
+    if (col === 'partidas' && a.matches('input.cell')) return true;
+    return !!(S.editing && S.editing.startsWith(col + '/') && a.closest('form.edit'));
+  }
+  function editBtn(col, id){ return `<button class="btn ghost" type="button" data-row="${esc(col + '/' + id)}">Editar</button>`; }
+  function metodoOptions(v){ return `<option value="banco"${v !== 'cash' ? ' selected' : ''}>Banco</option><option value="cash"${v === 'cash' ? ' selected' : ''}>Cash</option>`; }
+  function partidaOptions(v){
+    return compute().catList.map(c => `<optgroup label="${esc(c.nombre)}">${c.items.map(r =>
+      `<option value="${esc(r.id)}"${r.id === v ? ' selected' : ''}>${esc(r.nombre)}</option>`).join('')}</optgroup>`).join('');
+  }
+  function fieldHtml(f){
+    const v = S.draft[f.name] ?? '';
+    const id = 'e_' + f.name;
+    const ctl = f.type === 'select'
+      ? `<select id="${id}" name="${f.name}">${f.options(v)}</select>`
+      : `<input id="${id}" name="${f.name}" type="${f.type === 'int' ? 'number' : (f.type || 'text')}"${f.type === 'number' ? ' step="0.01" min="0" inputmode="decimal"' : ''}${f.type === 'int' ? ' step="1" min="0" inputmode="numeric"' : ''}${f.list ? ` list="${f.list}"` : ''} value="${esc(v)}" placeholder="${esc(f.ph || '')}">`;
+    return `<label class="${f.span ? 'span2' : ''}" for="${id}">${esc(f.label)}${ctl}</label>`;
+  }
+  function editRow(path, cols, fields){
+    return `<tr class="editing"><td colspan="${cols}"><form class="edit" data-save="${esc(path)}" autocomplete="off">${fields.map(fieldHtml).join('')}
+      <div class="acts"><button class="btn" type="submit">Guardar</button><button class="btn ghost" type="button" data-cancel>Cancelar</button></div>
+      <span class="msg" role="status"></span></form></td></tr>`;
+  }
+  const MOV_FIELDS = [
+    {name:'fecha', label:'Mes (aprox.)', type:'select', options: monthOptions},
+    {name:'partidaId', label:'Partida', type:'select', options: partidaOptions, span:true},
+    {name:'importe', label:'Importe (€)', type:'number'},
+    {name:'metodo', label:'Cómo', type:'select', options: metodoOptions},
+    {name:'pagador', label:'Quién paga', list:'pagadores'},
+    {name:'nota', label:'Nota', span:true},
+  ];
+  const REG_FIELDS = [
+    {name:'fecha', label:'Mes (aprox.)', type:'select', options: monthOptions},
+    {name:'de', label:'De parte de', span:true},
+    {name:'importe', label:'Importe (€)', type:'number'},
+    {name:'metodo', label:'Cómo', type:'select', options: metodoOptions},
+    {name:'adultos', label:'Adultos', type:'int'},
+    {name:'ninos', label:'Niños', type:'int'},
+    {name:'familia', label:'¿De los padres?', type:'select', options: v => `<option value="false"${String(v) !== 'true' ? ' selected' : ''}>No</option><option value="true"${String(v) === 'true' ? ' selected' : ''}>Sí</option>`},
+    {name:'nota', label:'Nota', span:true},
+  ];
+  const PAR_FIELDS = [
+    {name:'nombre', label:'Partida', span:true},
+    {name:'categoria', label:'Categoría', list:'categorias'},
+    {name:'proveedor', label:'Proveedor'},
+    {name:'previsto', label:'Previsto (€)', type:'number'},
+    {name:'final', label:'Precio final (€)', type:'number', ph:'Sin cerrar'},
+    {name:'notas', label:'Notas', span:true},
+  ];
+
+  function renderMovs(ready){
+    if (!ready || busy('movimientos')) return;
+    const fp = $('fltPartida').value, fm = $('fltMetodo').value, fw = $('fltPagador').value;
+    const list = S.movs.filter(m => (!fp || m.partidaId === fp) && (!fm || m.metodo === fm) && (!fw || m.pagador === fw))
+      .sort((a,b) => (b.fecha || '').localeCompare(a.fecha || '') || (b.creado || '').localeCompare(a.creado || ''));
+    if (!list.length) { $('movBody').innerHTML = `<tr><td colspan="6" class="empty">${S.movs.length ? 'Ningún movimiento con estos filtros.' : 'Aún no hay movimientos. Apunta el primero con el formulario de arriba.'}</td></tr>`; return; }
+    const total = list.reduce((s,m) => s + (+m.importe||0), 0);
+    $('movBody').innerHTML = list.map(m => {
+      if (S.editing === 'movimientos/' + m.id) return editRow(S.editing, 6, MOV_FIELDS);
+      const who = m.creadoPor && !String(m.creadoPor).startsWith('u_') ? ` · apuntado por ${esc(cap(m.creadoPor))}` : '';
+      return `<tr>
+        <td class="num" style="white-space:nowrap">${esc(fDate(m.fecha))}</td>
+        <td>${esc(partidaName(m.partidaId))}${m.nota || who ? `<div class="sub">${esc(m.nota || '')}${who}</div>` : ''}</td>
+        <td>${esc(m.pagador || '—')}</td>
+        <td><span class="pill ${m.metodo === 'cash' ? 'cash' : 'banco'}">${m.metodo === 'cash' ? 'Cash' : 'Banco'}</span></td>
+        <td class="r num">${fmt2(m.importe)}</td>
+        <td class="r acts-cell">${editBtn('movimientos', m.id)}${delBtn('movimientos', m.id)}</td></tr>`;
+    }).join('') + `<tr><td colspan="4"><strong style="font-weight:600">Total${fp||fm||fw?' filtrado':''}</strong></td><td class="r num"><strong>${fmt2(total)}</strong></td><td></td></tr>`;
+  }
+
+  function delBtn(col, id){
+    const key = col + '/' + id;
+    return S.confirm === key
+      ? `<button class="btn danger" type="button" data-del="${esc(key)}">¿Borrar? Sí</button>`
+      : `<button class="btn ghost" type="button" data-ask="${esc(key)}" aria-label="Borrar">Borrar</button>`;
+  }
+
+  function renderPartidas(C, ready){
+    if (!ready || busy('partidas')) return;
+    if (!C.catList.length) { $('parBody').innerHTML = `<tr><td colspan="7" class="empty">Aún no hay partidas. Añade la primera con el formulario de abajo.</td></tr>`; return; }
+    const hasMov = new Set(S.movs.map(m => m.partidaId));
+    $('parBody').innerHTML = C.catList.map(c => `<tr class="cat"><td colspan="7">${esc(c.nombre)} <span class="sub num" style="font-family:var(--f-ui)">· ${fmt(c.coste)}</span></td></tr>` +
+      c.items.map(r => {
+        if (S.editing === 'partidas/' + r.id) return editRow(S.editing, 7, PAR_FIELDS);
+        const st = r.coste && r.pagado >= r.coste - 0.5 ? ['done','Pagado'] : r.pagado > 0 ? ['part','Parcial'] : ['none','Sin pagar'];
+        return `<tr>
+          <td><span style="font-weight:500">${esc(r.nombre)}</span>${r.proveedor || r.notas ? `<div class="sub">${esc([r.proveedor, r.notas].filter(Boolean).join(' · '))}</div>` : ''}</td>
+          <td class="r"><input class="cell num" type="number" step="0.01" min="0" inputmode="decimal" aria-label="Previsto de ${esc(r.nombre)}" data-edit="${esc(r.id)}" data-field="previsto" value="${r.previsto ?? ''}"></td>
+          <td class="r"><input class="cell num" type="number" step="0.01" min="0" inputmode="decimal" aria-label="Precio final de ${esc(r.nombre)}" placeholder="—" data-edit="${esc(r.id)}" data-field="final" value="${r.final ?? ''}"></td>
+          <td class="r num">${fmt(r.pagado)}</td>
+          <td class="r num">${r.pendiente > 0.5 ? fmt(r.pendiente) : '—'}</td>
+          <td><span class="pill ${st[0]}">${st[1]}</span></td>
+          <td class="r acts-cell">${editBtn('partidas', r.id)}${hasMov.has(r.id) ? '' : delBtn('partidas', r.id)}</td></tr>`;
+      }).join('')).join('');
+  }
+
+  function renderRegalos(ready){
+    if (!ready || busy('regalos')) return;
+    const list = [...S.regalos].sort((a,b) => (b.fecha || '').localeCompare(a.fecha || '') || (b.creado || '').localeCompare(a.creado || ''));
+    renderRegKpis();
+    if (!list.length) { $('regBody').innerHTML = `<tr><td colspan="6" class="empty">Aún no hay regalos apuntados.</td></tr>`; return; }
+    const total = list.reduce((s,m) => s + (+m.importe||0), 0);
+    $('regBody').innerHTML = list.map(r => S.editing === 'regalos/' + r.id ? editRow(S.editing, 6, REG_FIELDS) : `<tr>
+      <td class="num" style="white-space:nowrap">${esc(fDate(r.fecha))}</td>
+      <td>${esc(r.de)}${r.nota ? `<div class="sub">${esc(r.nota)}</div>` : ''}</td>
+      <td class="num" style="white-space:nowrap">${personas(r)}</td>
+      <td><span class="pill ${r.metodo === 'cash' ? 'cash' : 'banco'}">${r.metodo === 'cash' ? 'Cash' : 'Banco'}</span></td>
+      <td class="r num">${fmt2(r.importe)}</td>
+      <td class="r acts-cell">${editBtn('regalos', r.id)}${delBtn('regalos', r.id)}</td></tr>`).join('') +
+      `<tr><td colspan="4"><strong style="font-weight:600">Total</strong></td><td class="r num"><strong>${fmt2(total)}</strong></td><td></td></tr>`;
+  }
+
+  function personas(r){
+    const a = Number.isFinite(r.adultos) ? r.adultos : null, n = Number.isFinite(r.ninos) ? r.ninos : null;
+    if (a == null && n == null) return '<span class="sub">—</span>';
+    const parts = [];
+    if (a != null) parts.push(`${a} ${a === 1 ? 'adulto' : 'adultos'}`);
+    if (n) parts.push(`${n} ${n === 1 ? 'niño' : 'niños'}`);
+    const per = a ? `<div class="sub">${esc(fmt(r.importe / a))} por adulto</div>` : '';
+    return esc(parts.join(' + ') || '0 adultos') + per;
+  }
+  function renderRegKpis(){
+    const sinFam = $('chkFam').checked;
+    const base = sinFam ? S.regalos.filter(r => !r.familia) : S.regalos;
+    const fuera = S.regalos.length - base.length;
+    const withCount = base.filter(r => Number.isFinite(r.adultos) && r.adultos > 0);
+    const adultos = withCount.reduce((s, r) => s + r.adultos, 0);
+    const ninos = base.reduce((s, r) => s + (Number.isFinite(r.ninos) ? r.ninos : 0), 0);
+    const importe = withCount.reduce((s, r) => s + (+r.importe || 0), 0);
+    const sinRecuento = base.length - withCount.length;
+    $('regKpis').innerHTML = `
+      <div class="kpi"><span class="eyebrow">Adultos</span><span class="v num">${adultos}</span><span class="s">en ${withCount.length} ${withCount.length === 1 ? 'regalo' : 'regalos'} con recuento</span></div>
+      <div class="kpi"><span class="eyebrow">Niños</span><span class="v num">${ninos}</span><span class="s">No cuentan para la media</span></div>
+      <div class="kpi hero"><span class="eyebrow">Media por adulto${sinFam ? ' · sin padres' : ''}</span><span class="v num">${adultos ? fmt(importe / adultos) : '—'}</span><span class="s">${adultos ? `${fmt(importe)} entre ${adultos} adultos` : 'Pon adultos en los regalos'}${sinFam && fuera ? ` · ${fuera} de padres fuera` : ''}</span></div>
+      <div class="kpi"><span class="eyebrow">Sin recuento</span><span class="v num">${sinRecuento}</span><span class="s">${sinRecuento ? 'Edítalos para sumar a la media' : 'Todos tienen personas'}</span></div>`;
+  }
+
+  function renderLists(C){
+    // partida select (grouped), filters, datalists
+    const keepP = $('mPartida').value, keepF = $('fltPartida').value, keepW = $('fltPagador').value;
+    $('mPartida').innerHTML = `<option value="">Elige una partida…</option>` + C.catList.map(c =>
+      `<optgroup label="${esc(c.nombre)}">${c.items.map(r => `<option value="${esc(r.id)}">${esc(r.nombre)}${r.pendiente>0.5?` · faltan ${esc(fmt(r.pendiente))}`:''}</option>`).join('')}</optgroup>`).join('');
+    $('mPartida').value = keepP;
+    $('fltPartida').innerHTML = `<option value="">Todas</option>` + C.catList.map(c =>
+      `<optgroup label="${esc(c.nombre)}">${c.items.map(r => `<option value="${esc(r.id)}">${esc(r.nombre)}</option>`).join('')}</optgroup>`).join('');
+    $('fltPartida').value = keepF;
+    const payers = [...new Set([...(S.ajustes.pagadores || []), ...S.movs.map(m => m.pagador).filter(Boolean)])];
+    $('pagadores').innerHTML = payers.map(p => `<option value="${esc(p)}"></option>`).join('');
+    $('fltPagador').innerHTML = `<option value="">Todos</option>` + payers.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('');
+    $('fltPagador').value = keepW;
+    const cats = [...new Set([...(S.ajustes.categorias || []), ...S.partidas.map(p => p.categoria).filter(Boolean)])];
+    $('categorias').innerHTML = cats.map(c => `<option value="${esc(c)}"></option>`).join('');
+  }
+
+  try { $('chkFam').checked = localStorage.getItem('sinFam') === '1'; } catch(e) {}
+  $('chkFam').addEventListener('change', () => { try { localStorage.setItem('sinFam', $('chkFam').checked ? '1' : '0'); } catch(e) {} renderRegKpis(); });
+  ['fltPartida','fltMetodo','fltPagador'].forEach(id => $(id).addEventListener('change', () => renderMovs(true)));
+
+  // ---------- writes ----------
+  function setSync(state, text){ const el = $('sync'); el.className = 'chip ' + state; $('syncText').textContent = text; }
+  function flash(id, text){ $(id).textContent = text; setTimeout(() => { if ($(id).textContent === text) $(id).textContent = ''; }, 3500); }
+  function errText(e){ return e && e.code === 'quota_exceeded' ? 'La base de datos está llena: borra movimientos antiguos.' : 'No se ha podido guardar. Revisa la conexión y vuelve a intentarlo.'; }
+  const amount = v => Math.round(parseFloat(String(v).replace(',', '.')) * 100) / 100;
+  const intOrNull = v => { const n = parseInt(String(v ?? '').trim(), 10); return Number.isFinite(n) && n >= 0 ? n : null; };
+
+  $('fMov').addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!db) return flash('mMsg', 'Sin conexión con la base de datos compartida.');
+    const importe = amount($('mImporte').value);
+    if (!$('mPartida').value || !(importe > 0)) return flash('mMsg', 'Elige una partida y pon un importe mayor que cero.');
+    try {
+      await db.collection('movimientos').add({ fecha: $('mFecha').value || null, partidaId: $('mPartida').value, importe,
+        metodo: document.querySelector('input[name=mMetodo]:checked').value, pagador: $('mPagador').value.trim(), nota: $('mNota').value.trim(),
+        creado: new Date().toISOString(), creadoPor: S.uid });
+      $('mImporte').value = ''; $('mNota').value = '';
+      flash('mMsg', `Apuntado: ${fmt2(importe)} en ${partidaName($('mPartida').value)}.`);
+    } catch(err) { flash('mMsg', errText(err)); }
+  });
+
+  $('fReg').addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!db) return flash('rMsg', 'Sin conexión con la base de datos compartida.');
+    const importe = amount($('rImporte').value);
+    if (!$('rDe').value.trim() || !(importe > 0)) return flash('rMsg', 'Pon de quién es y un importe mayor que cero.');
+    try {
+      await db.collection('regalos').add({ fecha: $('rFecha').value || null, de: $('rDe').value.trim(), importe,
+        metodo: document.querySelector('input[name=rMetodo]:checked').value, nota: $('rNota').value.trim(),
+        adultos: intOrNull($('rAdultos').value), ninos: intOrNull($('rNinos').value), familia: $('rFamilia').checked,
+        creado: new Date().toISOString(), creadoPor: S.uid });
+      ['rDe','rImporte','rNota','rAdultos','rNinos'].forEach(id => $(id).value = ''); $('rFamilia').checked = false;
+      flash('rMsg', `Regalo apuntado: ${fmt2(importe)}.`);
+    } catch(err) { flash('rMsg', errText(err)); }
+  });
+
+  $('fPar').addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!db) return flash('pMsg', 'Sin conexión con la base de datos compartida.');
+    const previsto = amount($('pPrev').value);
+    if (!$('pNombre').value.trim() || !(previsto >= 0)) return flash('pMsg', 'Pon un nombre y un importe previsto.');
+    try {
+      await db.collection('partidas').add({ nombre: $('pNombre').value.trim(), categoria: $('pCat').value.trim(), proveedor: $('pProv').value.trim(),
+        previsto, final: null, notas: '', orden: 900 + S.partidas.length, creado: new Date().toISOString(), creadoPor: S.uid });
+      ['pNombre','pProv','pPrev'].forEach(id => $(id).value = '');
+      flash('pMsg', 'Partida añadida.');
+    } catch(err) { flash('pMsg', errText(err)); }
+  });
+
+  document.addEventListener('change', async e => {
+    const el = e.target.closest('input[data-edit]'); if (!el || !db) return;
+    const v = el.value.trim() === '' ? null : amount(el.value);
+    if (el.dataset.field === 'previsto' && v == null) { render(); return; }
+    try { await db.doc('partidas/' + el.dataset.edit).update({ [el.dataset.field]: v }); }
+    catch(err) { setSync('off', 'No se ha guardado el cambio'); }
+  });
+
+  // edit rows: keep a draft so live updates never wipe what's being typed
+  document.addEventListener('input', e => {
+    const f = e.target.closest('form.edit');
+    if (f && e.target.name) S.draft[e.target.name] = e.target.value;
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && e.target.closest && e.target.closest('form.edit')) { S.editing = null; S.draft = {}; e.target.blur(); render(); }
+  });
+  document.addEventListener('submit', async e => {
+    const f = e.target.closest('form.edit'); if (!f) return;
+    e.preventDefault();
+    const say = t => { f.querySelector('.msg').textContent = t; };
+    if (!db) return say('Sin conexión con la base de datos compartida.');
+    const path = f.dataset.save, col = path.split('/')[0], d = S.draft;
+    const num = k => (d[k] === '' || d[k] == null) ? null : amount(d[k]);
+    const txt = k => String(d[k] ?? '').trim();
+    let upd;
+    if (col === 'movimientos') {
+      upd = { fecha: d.fecha || null, partidaId: d.partidaId, importe: num('importe'), metodo: d.metodo === 'cash' ? 'cash' : 'banco', pagador: txt('pagador'), nota: txt('nota') };
+      if (!upd.partidaId || !(upd.importe > 0)) return say('Elige una partida y pon un importe mayor que cero.');
+    } else if (col === 'regalos') {
+      upd = { fecha: d.fecha || null, de: txt('de'), importe: num('importe'), metodo: d.metodo === 'cash' ? 'cash' : 'banco', nota: txt('nota'), adultos: intOrNull(d.adultos), ninos: intOrNull(d.ninos), familia: String(d.familia) === 'true' };
+      if (!upd.de || !(upd.importe > 0)) return say('Pon de quién es y un importe mayor que cero.');
+    } else {
+      upd = { nombre: txt('nombre'), categoria: txt('categoria'), proveedor: txt('proveedor'), notas: txt('notas'), previsto: num('previsto') ?? 0, final: num('final') };
+      if (!upd.nombre) return say('La partida necesita un nombre.');
+    }
+    upd.editado = new Date().toISOString(); upd.editadoPor = S.uid;
+    say('Guardando…');
+    try {
+      await db.doc(path).update(upd);
+      S.editing = null; S.draft = {};
+      if (document.activeElement) document.activeElement.blur();
+      render();
+    } catch(err) { say(errText(err)); }
+  });
+
+  document.addEventListener('click', async e => {
+    const row = e.target.closest('[data-row]');
+    if (row) {
+      const [col, id] = row.dataset.row.split('/');
+      const src = (col === 'movimientos' ? S.movs : col === 'regalos' ? S.regalos : S.partidas).find(x => x.id === id);
+      if (!src) return;
+      S.editing = row.dataset.row; S.draft = { ...src }; S.confirm = null;
+      if (document.activeElement) document.activeElement.blur();
+      render();
+      setTimeout(() => { const el = document.querySelector('form.edit input, form.edit select'); el && el.focus(); }, 0);
+      return;
+    }
+    if (e.target.closest('[data-cancel]')) { S.editing = null; S.draft = {}; if (document.activeElement) document.activeElement.blur(); render(); return; }
+    const ask = e.target.closest('[data-ask]'), del = e.target.closest('[data-del]');
+    if (ask) { S.confirm = ask.dataset.ask; render(); setTimeout(() => { const b = document.querySelector(`[data-del="${CSS.escape(S.confirm||'')}"]`); b && b.focus(); }, 0); return; }
+    if (del && db) { const path = del.dataset.del; S.confirm = null; try { await db.doc(path).delete(); } catch(err) { setSync('off', 'No se ha podido borrar'); } return; }
+    if (S.confirm && !e.target.closest('button')) { S.confirm = null; render(); }
+  });
+
+  async function editBudget(){
+    const box = $('bLabel');
+    box.innerHTML = `<label style="flex-direction:row;align-items:center;gap:8px">Presupuesto (€) <input type="number" id="budgetIn" min="0" step="100" style="width:140px" value="${+S.ajustes.presupuesto || DEFAULT_BUDGET}"></label> <button class="btn" type="button" id="budgetSave">Guardar</button>`;
+    $('budgetIn').focus();
+    $('budgetSave').onclick = async () => {
+      const v = amount($('budgetIn').value);
+      if (!(v > 0) || !db) return render();
+      try { await db.doc('ajustes/general').set({ ...S.ajustes, presupuesto: v }); } catch(err) { setSync('off', 'No se ha guardado el presupuesto'); render(); }
+    };
+  }
+
+  // ---------- names of who added rows ----------
+  async function resolveNames(){
+    if (!user) return;
+    const ids = [...new Set([...S.movs, ...S.regalos].map(x => x.creadoPor).filter(Boolean))];
+    if (!ids.length) return;
+    const ps = await user.profiles(ids);
+    let changed = false;
+    for (const id of ids) { const n = ps[id] && ps[id].name; if (n && S.names[id] !== n) { S.names[id] = n; changed = true; } }
+    if (changed) renderMovs(true);
+  }
+
+  // ---------- backup ----------
+  let pendingImport = null;
+  $('bkExport').addEventListener('click', () => {
+    const strip = arr => Object.fromEntries(arr.map(({ id, ...rest }) => [id, rest]));
+    const data = { exportado: new Date().toISOString(), partidas: strip(S.partidas), movimientos: strip(S.movs), regalos: strip(S.regalos), ajustes: { general: S.ajustes } };
+    const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `presupuesto-boda-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    flash('bkMsg', 'Copia descargada.');
+  });
+  $('bkFile').addEventListener('change', async e => {
+    const file = e.target.files[0]; e.target.value = '';
+    if (!file) return;
+    try {
+      const data = JSON.parse(await file.text());
+      const cols = ['partidas', 'movimientos', 'regalos', 'ajustes'];
+      const writes = [];
+      for (const c of cols) for (const [id, body] of Object.entries(data[c] || {})) if (body && typeof body === 'object') writes.push([c, id, body]);
+      if (!writes.length) throw new Error('vacía');
+      pendingImport = writes;
+      const n = c => writes.filter(w => w[0] === c).length;
+      $('bkMsg').textContent = `La copia tiene ${n('partidas')} partidas, ${n('movimientos')} movimientos y ${n('regalos')} regalos.`;
+      $('bkConfirmWrap').innerHTML = `<button class="btn" type="button" id="bkConfirm">Cargar ${writes.length} filas</button> <button class="btn ghost" type="button" id="bkCancel">Cancelar</button>`;
+    } catch (err) { pendingImport = null; $('bkConfirmWrap').innerHTML = ''; flash('bkMsg', 'Ese archivo no es una copia válida del presupuesto.'); }
+  });
+  $('bkConfirmWrap').addEventListener('click', async e => {
+    if (e.target.id === 'bkCancel') { pendingImport = null; $('bkConfirmWrap').innerHTML = ''; $('bkMsg').textContent = ''; return; }
+    if (e.target.id !== 'bkConfirm' || !pendingImport || !db) return;
+    e.target.disabled = true; $('bkMsg').textContent = 'Cargando…';
+    try {
+      for (let i = 0; i < pendingImport.length; i += 400) {
+        const batch = db.batch();
+        for (const [c, id, body] of pendingImport.slice(i, i + 400)) batch.set(db.collection(c).doc(id), body);
+        await batch.commit();
+      }
+      flash('bkMsg', `Copia cargada: ${pendingImport.length} filas.`);
+    } catch (err) { flash('bkMsg', 'No se ha podido cargar la copia. ¿Tienes conexión y acceso?'); }
+    pendingImport = null; $('bkConfirmWrap').innerHTML = '';
+  });
+
+  // ---------- connect (Firebase) ----------
+  let unsubs = [];
+  function stopAll(){ unsubs.forEach(f => f()); unsubs = []; S.loaded = { p:false, m:false, r:false }; }
+  function listen(){
+    stopAll();
+    const onErr = e => setSync('off', e && e.code === 'permission-denied' ? 'Tu usuario no tiene acceso a los datos' : 'Conexión perdida: recarga la página');
+    const live = () => setSync('live', 'En directo');
+    unsubs.push(db.collection('partidas').onSnapshot(s => { S.partidas = s.docs.map(d => ({ id: d.id, ...d.data() })); S.loaded.p = true; live(); render(); }, onErr));
+    unsubs.push(db.collection('movimientos').onSnapshot(s => { S.movs = s.docs.map(d => ({ id: d.id, ...d.data() })); S.loaded.m = true; render(); }, onErr));
+    unsubs.push(db.collection('regalos').onSnapshot(s => { S.regalos = s.docs.map(d => ({ id: d.id, ...d.data() })); S.loaded.r = true; render(); }, onErr));
+    unsubs.push(db.doc('ajustes/general').onSnapshot(s => { S.ajustes = s.exists ? s.data() : {}; render(); }, onErr));
+  }
+  function start(){
+    const cfg = window.FIREBASE_CONFIG || {};
+    if (!window.firebase || !cfg.apiKey) {
+      $('loginMsg').textContent = 'Falta la configuración de Firebase (presupuesto/config.js).';
+      $('fLogin').querySelector('button').disabled = true;
+      return;
+    }
+    firebase.initializeApp(cfg);
+    const auth = firebase.auth();
+    db = firebase.firestore();
+    auth.onAuthStateChanged(u => {
+      if (u) {
+        S.uid = (u.email || '').split('@')[0];
+        $('who').textContent = cap(S.uid);
+        $('login').hidden = true; $('app').hidden = false;
+        listen();
+      } else {
+        stopAll();
+        $('app').hidden = true; $('login').hidden = false;
+        setTimeout(() => $('lUser').focus(), 0);
+      }
+    });
+    $('fLogin').addEventListener('submit', async e => {
+      e.preventDefault();
+      const u = $('lUser').value.trim(), p = $('lPass').value;
+      const email = u.includes('@') ? u : u.toLowerCase() + '@' + (cfg.userDomain || 'boda-jose-oarda.app');
+      $('loginMsg').textContent = 'Entrando…';
+      try { await auth.signInWithEmailAndPassword(email, p); $('loginMsg').textContent = ''; $('lPass').value = ''; }
+      catch (err) { $('loginMsg').textContent = err && err.code === 'auth/too-many-requests' ? 'Demasiados intentos. Espera unos minutos y vuelve a probar.' : 'Usuario o contraseña incorrectos.'; }
+    });
+    $('logout').addEventListener('click', () => auth.signOut());
+  }
+  start();
+})();
+</script>
+
+</body>
+</html>
