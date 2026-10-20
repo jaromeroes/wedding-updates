@@ -159,6 +159,17 @@ h1,h2,h3{margin:0;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
 .rtotal{display:flex;justify-content:space-between;padding:12px 18px;font-weight:700}
 .empty{padding:34px 18px;text-align:center;color:var(--muted)}
 
+/* ---------- historial ---------- */
+.frow{display:grid;grid-template-columns:32px minmax(0,1fr) auto;gap:12px;align-items:start;padding:12px 18px;border-bottom:1px solid var(--line)}
+.frow .avatar{width:32px;height:32px}
+.ftext{font-size:14.5px;overflow-wrap:anywhere}
+.ftext b{font-weight:700}
+.ftext .det{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+.ftime{font-size:12.5px;color:var(--muted);white-space:nowrap;padding-top:2px}
+.act{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.act.add{background:#3aa55a}.act.edit{background:#d8a21c}.act.del{background:var(--danger)}.act.other{background:var(--muted)}
+@media (max-width:640px){.frow{padding-inline:14px;grid-template-columns:28px minmax(0,1fr);row-gap:2px}.frow .avatar{width:28px;height:28px}.ftime{grid-column:2;padding-top:0}}
+
 /* ---------- splits ---------- */
 .split{display:flex;flex-direction:column;gap:10px}
 .sline{display:grid;grid-template-columns:minmax(80px,auto) minmax(0,1fr) auto;gap:10px;align-items:center;font-size:14px}
@@ -214,7 +225,7 @@ form.edit input,form.edit select{background:var(--surface)}
   .side{display:none}
   .main{padding:16px 16px calc(88px + env(safe-area-inset-bottom,0px));gap:16px}
   .only-m{display:inline-flex}
-  .bnav{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));box-shadow:0 -4px 20px rgba(0,0,0,.06)}
+  .bnav{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));box-shadow:0 -4px 20px rgba(0,0,0,.06)}
   .bnav button{display:flex;flex-direction:column;align-items:center;gap:3px;border:0;background:none;padding:6px 2px;border-radius:10px;font-size:11.5px;font-weight:600;color:var(--muted);cursor:pointer;min-height:52px}
   .bnav svg{width:22px;height:22px}
   .bnav button[aria-current="page"]{color:var(--brand)}
@@ -265,6 +276,7 @@ form.edit input,form.edit select{background:var(--surface)}
       <button class="navbtn" type="button" data-tab="movs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3"/></svg>Movimientos</button>
       <button class="navbtn" type="button" data-tab="partidas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg>Partidas</button>
       <button class="navbtn" type="button" data-tab="regalos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="13" rx="1.5"/><path d="M3 12h18M12 8v13M12 8c-1.5-3-5-4-5.5-1.5S9.5 8 12 8zm0 0c1.5-3 5-4 5.5-1.5S14.5 8 12 8z"/></svg>Regalos</button>
+      <button class="navbtn" type="button" data-tab="historial"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Historial</button>
     </nav>
     <div class="sfoot">
       <div class="me"><span class="avatar js-avatar"></span><span class="js-who" style="font-weight:600"></span><span style="flex:1"></span><button class="linkbtn js-logout" type="button">Salir</button></div>
@@ -316,6 +328,11 @@ form.edit input,form.edit select{background:var(--surface)}
         <div class="card"><div class="card-h"><h2>Efectivo y banco</h2></div><div class="card-b"><div class="split" id="methodSplit"></div><p class="note" id="cashNote"></p></div></div>
         <div class="card"><div class="card-h"><h2>Deuda con Unicaja</h2></div><div class="card-b"><div class="split" id="unicajaSplit"></div><p class="note">Los regalos que llegan por banco van a Unicaja y se descuentan de lo que le debemos.</p></div></div>
         <div class="card"><div class="card-h"><h2>Quién ha pagado</h2></div><div class="card-b"><div class="split" id="payerSplit"></div></div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><h2>Últimos cambios</h2><button class="linkbtn" type="button" data-tab="historial" style="color:var(--brand);opacity:1">Ver todo</button></div>
+        <div id="feedShort"><div class="empty">Cargando…</div></div>
       </div>
 
       <details class="card addcard">
@@ -404,6 +421,18 @@ form.edit input,form.edit select{background:var(--surface)}
       <div class="card"><div id="regList"><div class="empty">Cargando regalos…</div></div></div>
     </section>
 
+    <!-- HISTORIAL -->
+    <section class="panel" id="p-historial" hidden style="flex-direction:column;gap:16px">
+      <div class="card">
+        <div class="filters">
+          <label for="fltQuien">Quién<select id="fltQuien"><option value="">Todos</option></select></label>
+          <label for="fltTipo">Qué<select id="fltTipo"><option value="">Todo</option><option value="movimiento">Movimientos</option><option value="regalo">Regalos</option><option value="partida">Partidas</option><option value="presupuesto">Presupuesto</option></select></label>
+        </div>
+        <div id="feedList"><div class="empty">Cargando historial…</div></div>
+      </div>
+      <p class="note">El historial guarda quién añade, cambia o borra cada cosa desde que existe esta sección; lo apuntado antes no aparece aquí.</p>
+    </section>
+
     <datalist id="pagadores"></datalist>
     <datalist id="categorias"></datalist>
   </main>
@@ -413,6 +442,7 @@ form.edit input,form.edit select{background:var(--surface)}
     <button type="button" data-tab="movs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3"/></svg>Movimientos</button>
     <button type="button" data-tab="partidas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg>Partidas</button>
     <button type="button" data-tab="regalos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="13" rx="1.5"/><path d="M3 12h18M12 8v13M12 8c-1.5-3-5-4-5.5-1.5S9.5 8 12 8zm0 0c1.5-3 5-4 5.5-1.5S14.5 8 12 8z"/></svg>Regalos</button>
+    <button type="button" data-tab="historial"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Historial</button>
   </nav>
 </div>
 
@@ -444,7 +474,7 @@ form.edit input,form.edit select{background:var(--surface)}
   const fDate = s => { const m = s ? parseInt(String(s).slice(5, 7), 10) : 0; return m ? MESES[m - 1] : 'Sin mes'; };
   const monthOptions = v => `<option value="">Sin mes</option>` + MESES.map((n, i) => { const val = '2026-' + String(i + 1).padStart(2, '0'); return `<option value="${val}"${v && String(v).slice(0, 7) === val ? ' selected' : ''}>${n}</option>`; }).join('');
 
-  const S = { partidas: [], movs: [], regalos: [], ajustes: {}, loaded: {p:false,m:false,r:false}, uid: null, confirm: null, editing: null, draft: {}, collapsed: new Set() };
+  const S = { partidas: [], movs: [], regalos: [], ajustes: {}, hist: [], loaded: {p:false,m:false,r:false}, uid: null, confirm: null, editing: null, draft: {}, collapsed: new Set() };
   let db = null;
   try { S.collapsed = new Set(JSON.parse(localStorage.getItem('collapsed') || '[]')); } catch(e) {}
   const saveCollapsed = () => { try { localStorage.setItem('collapsed', JSON.stringify([...S.collapsed])); } catch(e) {} };
@@ -455,7 +485,7 @@ form.edit input,form.edit select{background:var(--surface)}
   $('countdown').textContent = cd; $('countdownM').textContent = cd + ' ·';
 
   // ---------- navigation ----------
-  const TABS = { resumen: 'Resumen', movs: 'Movimientos', partidas: 'Partidas', regalos: 'Regalos' };
+  const TABS = { resumen: 'Resumen', movs: 'Movimientos', partidas: 'Partidas', regalos: 'Regalos', historial: 'Historial' };
   function showTab(name, keepScroll){
     if (!TABS[name]) name = 'resumen';
     Object.keys(TABS).forEach(t => { const p = $('p-' + t); p.hidden = t !== name; p.style.display = t === name ? 'flex' : ''; });
@@ -515,6 +545,7 @@ form.edit input,form.edit select{background:var(--surface)}
     const C = compute();
     if (ready) renderHero(C);
     if (ready) { renderCats(C); renderSplits(C); renderMovs(); renderPartidas(C); renderRegalos(); }
+    renderFeed();
     renderLists(C);
   }
 
@@ -734,6 +765,67 @@ form.edit input,form.edit select{background:var(--surface)}
       <div class="stat"><span class="lab">Sin recuento</span><span class="val num">${sinRecuento}</span><span class="sub">${sinRecuento ? 'Edítalos para sumarlos' : 'Todos tienen personas'}</span></div>`;
   }
 
+  // ---------- historial ----------
+  const metodoTxt = m => m === 'cash' ? 'Cash' : 'Banco';
+  function describe(tipo, x){
+    if (!x) return '';
+    if (tipo === 'movimiento') return `${fmt2(x.importe)} en ${partidaName(x.partidaId)}`;
+    if (tipo === 'regalo') return `el regalo de ${x.de || '—'} (${fmt2(x.importe)})`;
+    if (tipo === 'partida') return `la partida ${x.nombre || '—'}`;
+    return '';
+  }
+  const DIFF = {
+    movimiento: { partidaId: ['partida', v => partidaName(v)], importe: ['importe', v => fmt2(v)], fecha: ['mes', fDate], metodo: ['cómo', metodoTxt], pagador: ['quién paga', v => v || '—'], nota: ['nota', v => v || '—'] },
+    regalo: { de: ['de parte de', v => v || '—'], importe: ['importe', v => fmt2(v)], fecha: ['mes', fDate], metodo: ['cómo', metodoTxt], adultos: ['adultos', v => v ?? '—'], ninos: ['niños', v => v ?? '—'], familia: ['de los padres', v => v ? 'sí' : 'no'], nota: ['nota', v => v || '—'] },
+    partida: { nombre: ['nombre', v => v || '—'], categoria: ['categoría', v => v || '—'], proveedor: ['proveedor', v => v || '—'], previsto: ['previsto', v => fmt(v)], final: ['precio final', v => v == null || v === '' ? 'sin cerrar' : fmt(v)], notas: ['notas', v => v || '—'] },
+  };
+  function diffText(tipo, a, b){
+    const map = DIFF[tipo] || {};
+    return Object.entries(map).map(([k, [lab, f]]) => [lab, String(f(a[k])), String(f(b[k]))]).filter(([, x, y]) => x !== y).map(([lab, x, y]) => `${lab}: ${x} → ${y}`).join(' · ');
+  }
+  async function log(accion, tipo, texto, detalle){
+    if (!db) return;
+    try { await db.collection('historial').add({ cuando: new Date().toISOString(), quien: S.uid || 'alguien', accion, tipo, texto, detalle: detalle || '' }); } catch(e) {}
+  }
+  function when(iso){
+    const d = new Date(iso), now = new Date(), mins = Math.round((now - d) / 60000);
+    if (mins < 1) return 'ahora';
+    if (mins < 60) return `hace ${mins} min`;
+    const hm = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    return dayKey(iso) === dayKey(now.toISOString()) ? hm : `${d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}, ${hm}`;
+  }
+  const dayKey = iso => { const d = new Date(iso); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; };
+  function dayLabel(iso){
+    const d = new Date(iso), t = new Date(), y = new Date(Date.now() - 86400000);
+    if (dayKey(iso) === dayKey(t.toISOString())) return 'Hoy';
+    if (dayKey(iso) === dayKey(y.toISOString())) return 'Ayer';
+    return d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+  }
+  function feedRow(h){
+    const cls = h.accion === 'añadió' ? 'add' : h.accion === 'editó' ? 'edit' : h.accion === 'borró' ? 'del' : 'other';
+    return `<div class="frow"><span class="avatar">${esc((h.quien || '?')[0].toUpperCase())}</span>
+      <span class="ftext"><span class="act ${cls}" aria-hidden="true"></span><b>${esc(cap(h.quien))}</b> ${esc(h.accion)} ${esc(h.texto)}${h.detalle ? `<span class="det">${esc(h.detalle)}</span>` : ''}</span>
+      <span class="ftime">${esc(when(h.cuando))}</span></div>`;
+  }
+  function renderFeed(){
+    const quienes = [...new Set(S.hist.map(h => h.quien).filter(Boolean))];
+    const keep = $('fltQuien').value;
+    $('fltQuien').innerHTML = `<option value="">Todos</option>` + quienes.map(q => `<option value="${esc(q)}">${esc(cap(q))}</option>`).join('');
+    $('fltQuien').value = keep;
+    const none = `<div class="empty">Todavía no hay cambios. Aquí saldrá cada cosa que se añada, cambie o borre.</div>`;
+    $('feedShort').innerHTML = S.hist.length ? S.hist.slice(0, 6).map(feedRow).join('') : none;
+    const fq = $('fltQuien').value, ft = $('fltTipo').value;
+    const list = S.hist.filter(h => (!fq || h.quien === fq) && (!ft || h.tipo === ft));
+    if (!list.length) { $('feedList').innerHTML = S.hist.length ? '<div class="empty">Nada con estos filtros.</div>' : none; return; }
+    let last = '';
+    $('feedList').innerHTML = list.map(h => {
+      const k = dayKey(h.cuando), head = k !== last ? `<div class="mhead"><span>${esc(dayLabel(h.cuando))}</span><span></span></div>` : '';
+      last = k; return head + feedRow(h);
+    }).join('');
+  }
+  ['fltQuien','fltTipo'].forEach(id => $(id).addEventListener('change', renderFeed));
+  setInterval(renderFeed, 60000);
+
   function renderLists(C){
     const keepP = $('mPartida').value, keepF = $('fltPartida').value, keepW = $('fltPagador').value;
     $('mPartida').innerHTML = `<option value="">Elige una partida…</option>` + C.catList.map(c =>
@@ -776,6 +868,8 @@ form.edit input,form.edit select{background:var(--surface)}
       await db.collection('movimientos').add({ fecha: $('mFecha').value || null, partidaId: $('mPartida').value, importe,
         metodo: document.querySelector('input[name=mMetodo]:checked').value, pagador: $('mPagador').value.trim(), nota: $('mNota').value.trim(),
         creado: new Date().toISOString(), creadoPor: S.uid });
+      const met = document.querySelector('input[name=mMetodo]:checked').value, pg = $('mPagador').value.trim();
+      log('añadió', 'movimiento', `${fmt2(importe)} en ${partidaName($('mPartida').value)}`, [metodoTxt(met), pg && `paga ${pg}`, $('mNota').value.trim()].filter(Boolean).join(' · '));
       $('mImporte').value = ''; $('mNota').value = '';
       flash('mMsg', `Apuntado: ${fmt2(importe)} en ${partidaName($('mPartida').value)}.`);
     } catch(err) { flash('mMsg', errText(err)); }
@@ -791,6 +885,7 @@ form.edit input,form.edit select{background:var(--surface)}
         metodo: document.querySelector('input[name=rMetodo]:checked').value, nota: $('rNota').value.trim(),
         adultos: intOrNull($('rAdultos').value), ninos: intOrNull($('rNinos').value), familia: $('rFamilia').checked,
         creado: new Date().toISOString(), creadoPor: S.uid });
+      log('añadió', 'regalo', `un regalo de ${$('rDe').value.trim()}: ${fmt2(importe)}`, [metodoTxt(document.querySelector('input[name=rMetodo]:checked').value), $('rAdultos').value && `${$('rAdultos').value} adultos`, $('rNota').value.trim()].filter(Boolean).join(' · '));
       ['rDe','rImporte','rNota','rAdultos','rNinos'].forEach(id => $(id).value = ''); $('rFamilia').checked = false;
       flash('rMsg', `Regalo apuntado: ${fmt2(importe)}.`);
     } catch(err) { flash('rMsg', errText(err)); }
@@ -804,6 +899,7 @@ form.edit input,form.edit select{background:var(--surface)}
     try {
       await db.collection('partidas').add({ nombre: $('pNombre').value.trim(), categoria: $('pCat').value.trim(), proveedor: $('pProv').value.trim(),
         previsto, final: null, notas: '', orden: 900 + S.partidas.length, creado: new Date().toISOString(), creadoPor: S.uid });
+      log('añadió', 'partida', `la partida ${$('pNombre').value.trim()}`, `${$('pCat').value.trim()} · previsto ${fmt(previsto)}`);
       ['pNombre','pProv','pPrev'].forEach(id => $(id).value = '');
       flash('pMsg', 'Partida añadida.');
     } catch(err) { flash('pMsg', errText(err)); }
@@ -839,7 +935,14 @@ form.edit input,form.edit select{background:var(--surface)}
     }
     upd.editado = new Date().toISOString(); upd.editadoPor = S.uid;
     say('Guardando…');
-    try { await db.doc(path).update(upd); closeEdit(); }
+    const tipo = col === 'movimientos' ? 'movimiento' : col === 'regalos' ? 'regalo' : 'partida';
+    const old = (col === 'movimientos' ? S.movs : col === 'regalos' ? S.regalos : S.partidas).find(x => x.id === path.split('/')[1]) || {};
+    try {
+      await db.doc(path).update(upd);
+      const changes = diffText(tipo, old, upd);
+      if (changes) log('editó', tipo, describe(tipo, old), changes);
+      closeEdit();
+    }
     catch(err) { say(errText(err)); }
   });
 
@@ -866,7 +969,13 @@ form.edit input,form.edit select{background:var(--surface)}
     if (e.target.closest('[data-cancel]')) { closeEdit(); return; }
     const ask = e.target.closest('[data-ask]'), del = e.target.closest('[data-del]');
     if (ask) { S.confirm = ask.dataset.ask; const f = ask.closest('form.edit'); ask.outerHTML = delBtn(S.confirm); f && f.querySelector('[data-del]').focus(); return; }
-    if (del && db) { const path = del.dataset.del; try { await db.doc(path).delete(); closeEdit(); } catch(err) { setSync('off', 'No se ha podido borrar'); } return; }
+    if (del && db) {
+      const path = del.dataset.del, [col, id] = path.split('/');
+      const tipo = col === 'movimientos' ? 'movimiento' : col === 'regalos' ? 'regalo' : 'partida';
+      const old = (col === 'movimientos' ? S.movs : col === 'regalos' ? S.regalos : S.partidas).find(x => x.id === id);
+      try { await db.doc(path).delete(); log('borró', tipo, describe(tipo, old)); closeEdit(); } catch(err) { setSync('off', 'No se ha podido borrar'); }
+      return;
+    }
   });
 
   function editBudget(){
@@ -876,7 +985,8 @@ form.edit input,form.edit select{background:var(--surface)}
     $('budgetSave').onclick = async () => {
       const v = amount($('budgetIn').value);
       if (!(v > 0) || !db) return;
-      try { await db.doc('ajustes/general').set({ ...S.ajustes, presupuesto: v }); $('bLabel').innerHTML = ''; render(); }
+      const before = +S.ajustes.presupuesto || DEFAULT_BUDGET;
+      try { await db.doc('ajustes/general').set({ ...S.ajustes, presupuesto: v }); if (v !== before) log('cambió', 'presupuesto', `el presupuesto: ${fmt(before)} → ${fmt(v)}`); $('bLabel').innerHTML = ''; render(); }
       catch(err) { setSync('off', 'No se ha guardado el presupuesto'); }
     };
   }
@@ -919,6 +1029,7 @@ form.edit input,form.edit select{background:var(--surface)}
         await batch.commit();
       }
       flash('bkMsg', `Copia cargada: ${pendingImport.length} filas.`);
+      log('cargó', 'copia', `una copia de seguridad con ${pendingImport.length} filas`);
     } catch (err) { flash('bkMsg', 'No se ha podido cargar la copia. ¿Tienes conexión y acceso?'); }
     pendingImport = null; $('bkConfirmWrap').innerHTML = '';
   });
@@ -933,6 +1044,7 @@ form.edit input,form.edit select{background:var(--surface)}
     unsubs.push(db.collection('partidas').onSnapshot(s => { S.partidas = s.docs.map(d => ({ id: d.id, ...d.data() })); S.loaded.p = true; live(); render(); }, onErr));
     unsubs.push(db.collection('movimientos').onSnapshot(s => { S.movs = s.docs.map(d => ({ id: d.id, ...d.data() })); S.loaded.m = true; render(); }, onErr));
     unsubs.push(db.collection('regalos').onSnapshot(s => { S.regalos = s.docs.map(d => ({ id: d.id, ...d.data() })); S.loaded.r = true; render(); }, onErr));
+    unsubs.push(db.collection('historial').orderBy('cuando', 'desc').limit(300).onSnapshot(s => { S.hist = s.docs.map(d => ({ id: d.id, ...d.data() })); renderFeed(); }, () => {}));
     unsubs.push(db.doc('ajustes/general').onSnapshot(s => { S.ajustes = s.exists ? s.data() : {}; render(); }, onErr));
   }
   function start(){
@@ -973,7 +1085,7 @@ form.edit input,form.edit select{background:var(--surface)}
   if (/[?&]demo\b/.test(location.search)) {
     fetch('demo.json').then(r => r.json()).then(data => {
       const toArr = o => Object.entries(o || {}).map(([id, v]) => ({ id, ...v }));
-      S.partidas = toArr(data.partidas); S.movs = toArr(data.movimientos); S.regalos = toArr(data.regalos); S.ajustes = (data.ajustes || {}).general || {};
+      S.partidas = toArr(data.partidas); S.movs = toArr(data.movimientos); S.regalos = toArr(data.regalos); S.ajustes = (data.ajustes || {}).general || {}; S.hist = toArr(data.historial).sort((a, b) => b.cuando.localeCompare(a.cuando));
       S.loaded = { p:true, m:true, r:true }; S.uid = 'demo';
       $('login').hidden = true; $('app').hidden = false; setSync('live', 'Vista previa'); render();
     });
