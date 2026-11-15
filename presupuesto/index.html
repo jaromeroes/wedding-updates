@@ -333,6 +333,24 @@ form.edit input,form.edit select{background:var(--surface)}
       </div>
 
       <div class="card">
+        <div class="card-h"><h2>Liquidación</h2><span class="note hide-m">Todo lo recibido menos todo lo pagado</span></div>
+        <div class="card-b">
+          <div class="stats" id="liqKpis"></div>
+          <span class="sublab" style="margin-top:6px">Para dejar las cuentas a cero</span>
+          <div id="liqPlan"></div>
+          <p class="note" id="liqNote"></p>
+          <span class="sublab" style="margin-top:6px">Cash ingresado en Unicaja</span>
+          <div id="trasList"></div>
+          <form class="grid-form" id="fTras" autocomplete="off" style="padding:0">
+            <label for="tImporte">Importe (€)<input type="number" id="tImporte" step="0.01" min="0.01" inputmode="decimal" required placeholder="0,00"></label>
+            <label for="tFecha">Mes (aprox.)<select id="tFecha"></select></label>
+            <label for="tNota">Nota<input id="tNota" placeholder="Ingreso en ventanilla…"></label>
+            <div class="acts"><button class="btn" type="submit">Apuntar ingreso de cash en Unicaja</button><span class="msg" id="tMsg" role="status"></span></div>
+          </form>
+        </div>
+      </div>
+
+      <div class="card">
         <div class="card-h"><h2>Últimos cambios</h2><button class="linkbtn" type="button" data-tab="historial" style="color:var(--brand);opacity:1">Ver todo</button></div>
         <div id="feedShort"><div class="empty">Cargando…</div></div>
       </div>
@@ -389,13 +407,15 @@ form.edit input,form.edit select{background:var(--surface)}
         <summary><span class="plus" aria-hidden="true">+</span>Nueva partida</summary>
         <form class="grid-form" id="fPar" autocomplete="off">
           <label for="pNombre" class="span2">Nombre<input id="pNombre" required placeholder="Ej. Invitaciones impresas"></label>
-          <label for="pCat">Categoría<input id="pCat" list="categorias" required placeholder="Detalles y decoración"></label>
+          <label for="pCatSel">Categoría<select id="pCatSel" required></select></label>
+          <label for="pCatNew" id="pCatNewWrap" hidden>Nombre de la nueva categoría<input id="pCatNew" placeholder="Ej. Viaje de novios"></label>
           <label for="pProv">Proveedor<input id="pProv" placeholder="Opcional"></label>
           <label for="pPrev">Previsto (€)<input type="number" id="pPrev" step="0.01" min="0" inputmode="decimal" required></label>
+          <label class="toggle" for="pAbierta" style="align-self:center"><input type="checkbox" id="pAbierta"> Gasto abierto: cuesta lo que se vaya pagando</label>
           <div class="acts"><button class="btn" type="submit">Añadir partida</button><span class="msg" id="pMsg" role="status"></span></div>
         </form>
       </details>
-      <p class="note">Toca una partida para editarla. El precio final, cuando lo hay, manda sobre el previsto.</p>
+      <p class="note">Toca una partida para editarla. El precio final, cuando lo hay, manda sobre el previsto. En un gasto abierto el coste es lo que se lleva pagado. Para crear una categoría, elige «Nueva categoría…» al añadir una partida.</p>
     </section>
 
     <!-- REGALOS -->
@@ -412,6 +432,7 @@ form.edit input,form.edit select{background:var(--surface)}
             <div class="seg" role="radiogroup" aria-label="Cómo llegó el regalo">
               <label><input type="radio" name="rMetodo" id="rCash" value="cash" checked><span>Cash</span></label>
               <label><input type="radio" name="rMetodo" id="rBanco" value="banco"><span>Banco</span></label>
+              <label><input type="radio" name="rMetodo" id="rDirecto" value="directo"><span>Directo</span></label>
             </div></div>
           <label for="rAdultos">Adultos<input type="number" id="rAdultos" min="0" step="1" inputmode="numeric" placeholder="2"></label>
           <label for="rNinos">Niños<input type="number" id="rNinos" min="0" step="1" inputmode="numeric" placeholder="0"></label>
@@ -428,7 +449,7 @@ form.edit input,form.edit select{background:var(--surface)}
       <div class="card">
         <div class="filters">
           <label for="fltQuien">Quién<select id="fltQuien"><option value="">Todos</option></select></label>
-          <label for="fltTipo">Qué<select id="fltTipo"><option value="">Todo</option><option value="movimiento">Movimientos</option><option value="regalo">Regalos</option><option value="partida">Partidas</option><option value="presupuesto">Presupuesto</option></select></label>
+          <label for="fltTipo">Qué<select id="fltTipo"><option value="">Todo</option><option value="movimiento">Movimientos</option><option value="regalo">Regalos</option><option value="partida">Partidas</option><option value="traspaso">Ingresos de cash en Unicaja</option><option value="presupuesto">Presupuesto</option></select></label>
         </div>
         <div id="feedList"><div class="empty">Cargando historial…</div></div>
       </div>
@@ -458,6 +479,8 @@ form.edit input,form.edit select{background:var(--surface)}
   const DEFAULT_BUDGET = 30000;
   const GIFT_CASH = 'Pagado con ingresos por regalo · cash';
   const UNICAJA = 'Unicaja';
+  // pagadores que aportan y no se les devuelve (la empresa, o quien paga directamente con cargo a su regalo)
+  const NO_DEVOLVER = ['B2B Tinkkers', 'Madre de Jose'];
   const eur = new Intl.NumberFormat('es-ES', {style:'currency', currency:'EUR', maximumFractionDigits:0, useGrouping:'always'});
   const eur2 = new Intl.NumberFormat('es-ES', {style:'currency', currency:'EUR', minimumFractionDigits:2, maximumFractionDigits:2, useGrouping:'always'});
   const fmt = n => eur.format(Math.round(n || 0));
@@ -476,7 +499,7 @@ form.edit input,form.edit select{background:var(--surface)}
   const fDate = s => { const m = s ? parseInt(String(s).slice(5, 7), 10) : 0; return m ? MESES[m - 1] : 'Sin mes'; };
   const monthOptions = v => `<option value="">Sin mes</option>` + MESES.map((n, i) => { const val = '2026-' + String(i + 1).padStart(2, '0'); return `<option value="${val}"${v && String(v).slice(0, 7) === val ? ' selected' : ''}>${n}</option>`; }).join('');
 
-  const S = { partidas: [], movs: [], regalos: [], ajustes: {}, hist: [], loaded: {p:false,m:false,r:false}, uid: null, confirm: null, editing: null, draft: {}, collapsed: new Set() };
+  const S = { partidas: [], movs: [], regalos: [], tras: [], ajustes: {}, hist: [], loaded: {p:false,m:false,r:false}, uid: null, confirm: null, editing: null, draft: {}, collapsed: new Set() };
   let db = null;
   try { S.collapsed = new Set(JSON.parse(localStorage.getItem('collapsed') || '[]')); } catch(e) {}
   const saveCollapsed = () => { try { localStorage.setItem('collapsed', JSON.stringify([...S.collapsed])); } catch(e) {} };
@@ -501,15 +524,16 @@ form.edit input,form.edit select{background:var(--surface)}
   try { const h = location.hash.slice(1); startTab = TABS[h] ? h : (localStorage.getItem('tab') || 'resumen'); } catch(e) {}
   showTab(startTab, true);
 
-  $('mFecha').innerHTML = monthOptions(thisMonth()); $('rFecha').innerHTML = monthOptions(thisMonth());
+  $('mFecha').innerHTML = monthOptions(thisMonth()); $('rFecha').innerHTML = monthOptions(thisMonth()); $('tFecha').innerHTML = monthOptions(thisMonth());
 
   // ---------- derived numbers ----------
   function compute(){
     const paidBy = {};
     for (const m of S.movs) paidBy[m.partidaId] = (paidBy[m.partidaId] || 0) + (+m.importe || 0);
     const rows = S.partidas.map(p => {
-      const coste = (p.final != null && p.final !== '') ? +p.final : (+p.previsto || 0);
       const pagado = paidBy[p.id] || 0;
+      // gasto abierto (p. ej. gastos del viaje de novios): cuesta exactamente lo que se ha pagado
+      const coste = p.abierta ? pagado : (p.final != null && p.final !== '') ? +p.final : (+p.previsto || 0);
       return { ...p, coste, pagado, pendiente: Math.max(coste - pagado, 0) };
     });
     const cats = {};
@@ -527,7 +551,7 @@ form.edit input,form.edit select{background:var(--surface)}
     const coste = sum(rows, r => r.coste), pagado = sum(S.movs, m => m.importe), pendiente = sum(rows, r => r.pendiente);
     const regalos = sum(S.regalos, r => r.importe);
     const by = (arr, key) => arr.reduce((o, x) => (o[x[key] || '—'] = (o[x[key] || '—'] || 0) + (+x.importe || 0), o), {});
-    return { rows, catList, coste, pagado, pendiente, regalos,
+    return { rows, catList, coste, pagado, pendiente, regalos, traspasos: sum(S.tras, t => t.importe),
       pagMet: by(S.movs, 'metodo'), regMet: by(S.regalos, 'metodo'), pagador: by(S.movs, 'pagador'),
       budget: +S.ajustes.presupuesto || DEFAULT_BUDGET };
   }
@@ -559,7 +583,7 @@ form.edit input,form.edit select{background:var(--surface)}
     const ready = S.loaded.p && S.loaded.m && S.loaded.r;
     const C = compute();
     if (ready) renderHero(C);
-    if (ready) { renderCats(C); renderSplits(C); renderMovs(); renderPartidas(C); renderRegalos(); }
+    if (ready) { renderCats(C); renderSplits(C); renderLiq(C); renderMovs(); renderPartidas(C); renderRegalos(); }
     renderFeed();
     renderLists(C);
   }
@@ -617,18 +641,83 @@ form.edit input,form.edit select{background:var(--surface)}
       `<span class="sublab">Pagos</span>` + sline('Cash', pc, max, 'var(--cash-ink)') + sline('Banco', pb, max, 'var(--bank-ink)') +
       `<span class="sublab" style="margin-top:4px">Regalos</span>` + sline('Cash', rc, max, 'var(--cash-ink)') + sline('Banco', rb, max, 'var(--bank-ink)');
     // cash gifts are spent directly ("Pagado con ingresos por regalo · cash"); bank gifts go to Unicaja
-    const giftCashSpent = C.pagador[GIFT_CASH] || 0;
-    const bal = rc - giftCashSpent;
+    const giftCashSpent = C.pagador[GIFT_CASH] || 0, tras = C.traspasos;
+    const bal = rc - giftCashSpent - tras;
     $('cashNote').textContent = bal >= 0
-      ? `Efectivo de regalos: han llegado ${fmt(rc)}, se han gastado ${fmt(giftCashSpent)} y quedan ${fmt(bal)} en mano.`
-      : `Se han apuntado ${fmt(giftCashSpent)} pagados con regalos en cash, pero solo han llegado ${fmt(rc)} en regalos en cash: faltan ${fmt(-bal)} por apuntar como regalo.`;
-    const uni = C.pagador[UNICAJA] || 0, deuda = uni - rb;
-    const umax = Math.max(uni, rb, 1);
+      ? `Efectivo de regalos: han llegado ${fmt(rc)}, se han gastado ${fmt(giftCashSpent)}${tras ? `, se han ingresado ${fmt(tras)} en Unicaja` : ''} y quedan ${fmt(bal)} en mano.`
+      : `Se han apuntado ${fmt(giftCashSpent + tras)} sacados del cash de regalos, pero solo han llegado ${fmt(rc)} en regalos en cash: faltan ${fmt(-bal)} por apuntar como regalo.`;
+    const uni = C.pagador[UNICAJA] || 0, deuda = uni - rb - tras;
+    const umax = Math.max(uni, rb, tras, 1);
     $('unicajaSplit').innerHTML = sline('Ha adelantado', uni, umax, 'var(--bar)') + sline('Regalos por banco', rb, umax, 'var(--bank-ink)') +
+      (tras ? sline('Cash ingresado', tras, umax, 'var(--cash-ink)') : '') +
       `<div class="sline" style="margin-top:4px"><span style="font-weight:600">${deuda >= 0 ? 'Le debemos' : 'A nuestro favor'}</span><span></span><span class="num big" style="color:${deuda > 0.5 ? 'var(--danger)' : 'var(--pos)'}">${fmt(Math.abs(deuda))}</span></div>`;
     const payers = Object.entries(C.pagador).sort((a,b) => b[1] - a[1]);
     const pmax = Math.max(...payers.map(p => p[1]), 1);
     $('payerSplit').innerHTML = payers.length ? payers.map(([n, v]) => sline(n, v, pmax, 'var(--bar)')).join('') : '<p class="note">Todavía no hay pagos.</p>';
+  }
+
+  // ---------- liquidación ----------
+  // Hay dos bolsas de dinero: el cash de regalos que queda en mano y el saldo de Unicaja (regalos por banco + cash
+  // ingresado − lo que Unicaja ha pagado; si es negativo, es deuda). Los regalos «directo al proveedor» no entran en
+  // ninguna bolsa, y lo que pagan quienes aportan (NO_DEVOLVER) no se devuelve. Quien pagó de su bolsillo (Jose,
+  // Oarda…) tiene que cobrarlo. Primero se tapa la deuda de Unicaja con cash; luego se devuelve a cada persona, con el cash que
+  // quede y después desde Unicaja. Si no llega para todos, a cada uno se le devuelve la misma proporción.
+  function liquidacion(C){
+    const rc = C.regMet.cash || 0, rb = C.regMet.banco || 0;
+    const cashMano = rc - (C.pagador[GIFT_CASH] || 0) - C.traspasos;
+    const saldoUni = rb + C.traspasos - (C.pagador[UNICAJA] || 0);
+    const sinAsignar = Object.entries(C.pagador).filter(([n]) => n === '—' || /^sin asignar$/i.test(n)).reduce((s, [, v]) => s + v, 0);
+    const noDev = S.ajustes.noDevolver || NO_DEVOLVER;
+    const aportan = Object.entries(C.pagador).filter(([n]) => noDev.includes(n));
+    const personas = Object.entries(C.pagador).filter(([n, v]) => v > 0.005 && ![GIFT_CASH, UNICAJA, '—', ...noDev].includes(n) && !/^sin asignar$/i.test(n)).sort((a, b) => b[1] - a[1]);
+    let cash = Math.max(cashMano, 0), uni = Math.max(saldoUni, 0);
+    const plan = [];
+    const deudaUni = Math.max(-saldoUni, 0);
+    if (deudaUni > 0.005) { const x = Math.min(cash, deudaUni); cash -= x; plan.push({ quien: UNICAJA, debe: deudaUni, cash: x, uni: 0, falta: deudaUni - x }); }
+    const T = personas.reduce((s, [, v]) => s + v, 0);
+    const ratio = T > 0 ? Math.min(1, (cash + uni) / T) : 1;
+    for (const [quien, v] of personas) {
+      let a = v * ratio;
+      const x = Math.min(cash, a); cash -= x; a -= x;
+      const y = Math.min(uni, a); uni -= y;
+      plan.push({ quien, debe: v, cash: x, uni: y, falta: v - x - y });
+    }
+    // recibido = regalos que han llegado a cash o a Unicaja + lo pagado por quienes aportan (incluye los regalos directos)
+    const recibido = rc + rb + aportan.reduce((s, [, v]) => s + v, 0);
+    return { cashMano, saldoUni, sinAsignar, aportan, plan, sobraCash: cash, sobraUni: uni, recibido, neto: recibido - C.pagado };
+  }
+  function renderLiq(C){
+    const L = liquidacion(C);
+    const st = (lab, val, sub, color) => `<div class="stat"><span class="lab">${lab}</span><span class="val num"${color ? ` style="color:${color}"` : ''}>${val}</span><span class="sub">${sub}</span></div>`;
+    $('liqKpis').innerHTML =
+      st('Recibido', fmt(L.recibido), L.aportan.length ? `regalos + lo que pagan ${L.aportan.map(a => a[0]).join(' y ')}` : `${S.regalos.length} regalos`) +
+      st('Pagado', fmt(C.pagado), `${S.movs.length} movimientos`) +
+      st(L.neto >= 0 ? 'Sobra' : 'Ponemos nosotros', fmt(Math.abs(L.neto)), 'Recibido − pagado', L.neto >= 0 ? 'var(--pos)' : 'var(--danger)') +
+      st('Ahora mismo hay', `${fmt(Math.max(L.cashMano, 0))} cash`, L.saldoUni >= 0 ? `y ${fmt(L.saldoUni)} a favor en Unicaja` : `y ${fmt(-L.saldoUni)} de deuda en Unicaja`);
+    const fuente = p => [p.cash > 0.5 && `<span class="tag cash">${esc(fmt(p.cash))} de cash</span>`, p.uni > 0.5 && `<span class="tag banco">${esc(fmt(p.uni))} desde Unicaja</span>`].filter(Boolean).join('');
+    const rows = L.plan.filter(p => p.debe > 0.5).map(p => {
+      const pagar = p.cash + p.uni;
+      const sub = p.quien === UNICAJA ? `Le debemos ${fmt(p.debe)}` : `Ha pagado ${fmt(p.debe)} de su bolsillo`;
+      const falta = p.falta > 0.5 ? ` · ${p.quien === UNICAJA ? 'quedan' : 'pone'} ${fmt(p.falta)} sin cubrir` : '';
+      return `<div class="trow" style="cursor:default">
+        <span class="tmain"><span class="t">${p.quien === UNICAJA ? 'Pagar a Unicaja' : `Devolver a ${esc(p.quien)}`}</span><span class="s">${esc(sub + falta)}</span></span>
+        <span class="tags">${fuente(p)}</span>
+        <span class="tamt num">${fmt(pagar)}</span></div>`;
+    }).join('');
+    $('liqPlan').innerHTML = rows || `<div class="empty">No hay nada que devolver: nadie ha pagado de su bolsillo ni hay deuda con Unicaja.</div>`;
+    const notes = [];
+    if (L.sobraCash > 0.5 || L.sobraUni > 0.5) notes.push(`Después de liquidar sobran ${[L.sobraCash > 0.5 && fmt(L.sobraCash) + ' en cash', L.sobraUni > 0.5 && fmt(L.sobraUni) + ' en Unicaja'].filter(Boolean).join(' y ')}.`);
+    if (L.plan.some(p => p.falta > 0.5)) notes.push('Lo recibido no llega para devolverlo todo: a cada persona se le devuelve la misma proporción de lo que puso, y lo que queda sin cubrir es lo que pone cada uno.');
+    if (L.aportan.length) notes.push(`No se devuelve lo que han pagado ${L.aportan.map(([n, v]) => `${n} (${fmt(v)})`).join(' y ')}: cuenta como su aportación.`);
+    if (L.sinAsignar > 0.5) notes.push(`Hay ${fmt(L.sinAsignar)} en movimientos sin decir quién pagó; no entran en la liquidación hasta que se asignen.`);
+    if (L.cashMano < -0.5) notes.push(`Ojo: sale más cash del que ha llegado en regalos (${fmt(-L.cashMano)} de más).`);
+    $('liqNote').textContent = notes.join(' ');
+    const list = [...S.tras].sort((a, b) => (b.creado || '').localeCompare(a.creado || ''));
+    $('trasList').innerHTML = list.length ? list.map(t => `<div class="trow" style="cursor:default">
+        <span class="tmain"><span class="t">Cash → Unicaja</span><span class="s">${esc([fDate(t.fecha), t.nota].filter(Boolean).join(' · '))}</span></span>
+        <span class="tags">${delBtn('traspasos/' + t.id)}</span>
+        <span class="tamt num">${fmt2(t.importe)}</span></div>`).join('')
+      : `<p class="note">Todavía no se ha apuntado ningún ingreso de cash en Unicaja.</p>`;
   }
 
   function partidaName(id){ const p = S.partidas.find(x => x.id === id); return p ? p.nombre : 'Partida borrada'; }
@@ -653,9 +742,10 @@ form.edit input,form.edit select{background:var(--surface)}
     return `<label class="${f.span ? 'span2' : ''}" for="${id}">${esc(f.label)}${ctl}</label>`;
   }
   function delBtn(path){
+    const sm = path.startsWith('traspasos/') ? ' small' : '';
     return S.confirm === path
-      ? `<button class="btn danger" type="button" data-del="${esc(path)}">Sí, borrar</button>`
-      : `<button class="btn ghost" type="button" data-ask="${esc(path)}">Borrar</button>`;
+      ? `<button class="btn danger${sm}" type="button" data-del="${esc(path)}">Sí, borrar</button>`
+      : `<button class="btn ghost${sm}" type="button" data-ask="${esc(path)}">Borrar</button>`;
   }
   function editBlock(path, fields, canDelete, note){
     return `<div class="editing"><form class="edit" data-save="${esc(path)}" autocomplete="off">${fields.map(fieldHtml).join('')}
@@ -674,7 +764,7 @@ form.edit input,form.edit select{background:var(--surface)}
     {name:'de', label:'De parte de', span:true},
     {name:'importe', label:'Importe (€)', type:'number'},
     {name:'fecha', label:'Mes (aprox.)', type:'select', options: monthOptions},
-    {name:'metodo', label:'Cómo', type:'select', options: metodoOptions},
+    {name:'metodo', label:'Cómo', type:'select', options: v => metodoOptions(v) + `<option value="directo"${v === 'directo' ? ' selected' : ''}>Directo al proveedor</option>`},
     {name:'adultos', label:'Adultos', type:'int'},
     {name:'ninos', label:'Niños', type:'int'},
     {name:'familia', label:'¿De los padres?', type:'select', options: v => `<option value="false"${String(v) !== 'true' ? ' selected' : ''}>No</option><option value="true"${String(v) === 'true' ? ' selected' : ''}>Sí</option>`},
@@ -686,6 +776,7 @@ form.edit input,form.edit select{background:var(--surface)}
     {name:'proveedor', label:'Proveedor'},
     {name:'previsto', label:'Previsto (€)', type:'number'},
     {name:'final', label:'Precio final (€)', type:'number', ph:'Sin cerrar'},
+    {name:'abierta', label:'Tipo de gasto', type:'select', options: v => `<option value="false"${String(v) !== 'true' ? ' selected' : ''}>Con precio</option><option value="true"${String(v) === 'true' ? ' selected' : ''}>Abierto (lo que se pague)</option>`},
     {name:'pago', label:'Forma de pago', type:'select', options: v => [['', 'Según los pagos'], ['cash', 'Cash'], ['banco', 'Banco'], ['mixto', 'Mixto']].map(([k, l]) => `<option value="${k}"${(v || '') === k ? ' selected' : ''}>${l}</option>`).join('')},
     {name:'notas', label:'Notas', span:true},
   ];
@@ -766,7 +857,7 @@ form.edit input,form.edit select{background:var(--surface)}
         const sub = [personas(r), r.nota].filter(Boolean).join(' · ');
         return `<button class="trow" type="button" data-row="${esc(path)}">
           <span class="tmain"><span class="t">${esc(r.de)}</span>${sub ? `<span class="s">${esc(sub)}</span>` : ''}</span>
-          <span class="tags">${r.familia ? '<span class="tag fam">Padres</span>' : ''}<span class="tag ${r.metodo === 'cash' ? 'cash' : 'banco'}">${r.metodo === 'cash' ? 'Cash' : 'Banco'}</span></span>
+          <span class="tags">${r.familia ? '<span class="tag fam">Padres</span>' : ''}<span class="tag ${r.metodo === 'cash' ? 'cash' : r.metodo === 'directo' ? 'fam' : 'banco'}">${metodoTxt(r.metodo)}</span></span>
           <span class="tamt num pos">+${fmt2(r.importe)}</span></button>`;
       }).join('')).join('') +
       `<div class="rtotal"><span>Total</span><span class="num" style="color:var(--pos)">+${fmt2(total)}</span></div>`;
@@ -788,18 +879,19 @@ form.edit input,form.edit select{background:var(--surface)}
   }
 
   // ---------- historial ----------
-  const metodoTxt = m => m === 'cash' ? 'Cash' : 'Banco';
+  const metodoTxt = m => m === 'cash' ? 'Cash' : m === 'directo' ? 'Directo al proveedor' : 'Banco';
   function describe(tipo, x){
     if (!x) return '';
     if (tipo === 'movimiento') return `${fmt2(x.importe)} en ${partidaName(x.partidaId)}`;
     if (tipo === 'regalo') return `el regalo de ${x.de || '—'} (${fmt2(x.importe)})`;
     if (tipo === 'partida') return `la partida ${x.nombre || '—'}`;
+    if (tipo === 'traspaso') return `el ingreso de ${fmt2(x.importe)} de cash en Unicaja`;
     return '';
   }
   const DIFF = {
     movimiento: { partidaId: ['partida', v => partidaName(v)], importe: ['importe', v => fmt2(v)], fecha: ['mes', fDate], metodo: ['cómo', metodoTxt], pagador: ['quién paga', v => v || '—'], nota: ['nota', v => v || '—'] },
     regalo: { de: ['de parte de', v => v || '—'], importe: ['importe', v => fmt2(v)], fecha: ['mes', fDate], metodo: ['cómo', metodoTxt], adultos: ['adultos', v => v ?? '—'], ninos: ['niños', v => v ?? '—'], familia: ['de los padres', v => v ? 'sí' : 'no'], nota: ['nota', v => v || '—'] },
-    partida: { nombre: ['nombre', v => v || '—'], categoria: ['categoría', v => v || '—'], proveedor: ['proveedor', v => v || '—'], previsto: ['previsto', v => fmt(v)], final: ['precio final', v => v == null || v === '' ? 'sin cerrar' : fmt(v)], notas: ['notas', v => v || '—'], pago: ['forma de pago', v => ({ cash: 'cash', banco: 'banco', mixto: 'mixto' })[v] || 'según los pagos'] },
+    partida: { nombre: ['nombre', v => v || '—'], categoria: ['categoría', v => v || '—'], proveedor: ['proveedor', v => v || '—'], previsto: ['previsto', v => fmt(v)], final: ['precio final', v => v == null || v === '' ? 'sin cerrar' : fmt(v)], abierta: ['gasto abierto', v => v ? 'sí' : 'no'], notas: ['notas', v => v || '—'], pago: ['forma de pago', v => ({ cash: 'cash', banco: 'banco', mixto: 'mixto' })[v] || 'según los pagos'] },
   };
   function diffText(tipo, a, b){
     const map = DIFF[tipo] || {};
@@ -862,6 +954,9 @@ form.edit input,form.edit select{background:var(--surface)}
     $('fltPagador').value = keepW;
     const cats = [...new Set([...(S.ajustes.categorias || []), ...S.partidas.map(p => p.categoria).filter(Boolean)])];
     $('categorias').innerHTML = cats.map(c => `<option value="${esc(c)}"></option>`).join('');
+    const keepC = $('pCatSel').value;
+    $('pCatSel').innerHTML = `<option value="">Elige una categoría…</option>` + cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('') + `<option value="__new">＋ Nueva categoría…</option>`;
+    $('pCatSel').value = keepC;
   }
 
   try { $('chkFam').checked = localStorage.getItem('sinFam') === '1'; } catch(e) {}
@@ -913,18 +1008,40 @@ form.edit input,form.edit select{background:var(--surface)}
     } catch(err) { flash('rMsg', errText(err)); }
   });
 
+  $('pCatSel').addEventListener('change', () => {
+    const nueva = $('pCatSel').value === '__new';
+    $('pCatNewWrap').hidden = !nueva; $('pCatNew').required = nueva;
+    if (nueva) $('pCatNew').focus();
+  });
   $('fPar').addEventListener('submit', async e => {
     e.preventDefault();
     if (!db) return flash('pMsg', 'Sin conexión con la base de datos.');
-    const previsto = amount($('pPrev').value);
-    if (!$('pNombre').value.trim() || !(previsto >= 0)) return flash('pMsg', 'Pon un nombre y un importe previsto.');
+    const abierta = $('pAbierta').checked;
+    const previsto = abierta && $('pPrev').value === '' ? 0 : amount($('pPrev').value);
+    const categoria = ($('pCatSel').value === '__new' ? $('pCatNew').value : $('pCatSel').value).trim();
+    if (!$('pNombre').value.trim() || !categoria || !(previsto >= 0)) return flash('pMsg', 'Pon un nombre, una categoría y un importe previsto.');
     try {
-      await db.collection('partidas').add({ nombre: $('pNombre').value.trim(), categoria: $('pCat').value.trim(), proveedor: $('pProv').value.trim(),
-        previsto, final: null, notas: '', orden: 900 + S.partidas.length, creado: new Date().toISOString(), creadoPor: S.uid });
-      log('añadió', 'partida', `la partida ${$('pNombre').value.trim()}`, `${$('pCat').value.trim()} · previsto ${fmt(previsto)}`);
-      ['pNombre','pProv','pPrev'].forEach(id => $(id).value = '');
+      await db.collection('partidas').add({ nombre: $('pNombre').value.trim(), categoria, proveedor: $('pProv').value.trim(),
+        previsto, final: null, abierta, notas: '', orden: 900 + S.partidas.length, creado: new Date().toISOString(), creadoPor: S.uid });
+      log('añadió', 'partida', `la partida ${$('pNombre').value.trim()}`, `${categoria} · ${abierta ? 'gasto abierto' : `previsto ${fmt(previsto)}`}`);
+      ['pNombre','pProv','pPrev','pCatNew'].forEach(id => $(id).value = ''); $('pAbierta').checked = false;
+      $('pCatSel').value = categoria; $('pCatNewWrap').hidden = true; $('pCatNew').required = false;
       flash('pMsg', 'Partida añadida.');
     } catch(err) { flash('pMsg', errText(err)); }
+  });
+
+  $('fTras').addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!db) return flash('tMsg', 'Sin conexión con la base de datos.');
+    const importe = amount($('tImporte').value);
+    if (!(importe > 0)) return flash('tMsg', 'Pon un importe mayor que cero.');
+    try {
+      await db.collection('traspasos').add({ fecha: $('tFecha').value || null, importe, de: 'cash', a: UNICAJA, nota: $('tNota').value.trim(),
+        creado: new Date().toISOString(), creadoPor: S.uid });
+      log('apuntó', 'traspaso', `un ingreso de ${fmt2(importe)} de cash en Unicaja`, $('tNota').value.trim());
+      $('tImporte').value = ''; $('tNota').value = '';
+      flash('tMsg', `Apuntado: ${fmt2(importe)} de cash a Unicaja.`);
+    } catch(err) { flash('tMsg', errText(err)); }
   });
 
   // edit forms keep a draft so live updates never wipe what's being typed
@@ -949,10 +1066,10 @@ form.edit input,form.edit select{background:var(--surface)}
       upd = { fecha: d.fecha || null, partidaId: d.partidaId, importe: num('importe'), metodo: d.metodo === 'cash' ? 'cash' : 'banco', pagador: txt('pagador'), nota: txt('nota') };
       if (!upd.partidaId || !(upd.importe > 0)) return say('Elige una partida y pon un importe mayor que cero.');
     } else if (col === 'regalos') {
-      upd = { fecha: d.fecha || null, de: txt('de'), importe: num('importe'), metodo: d.metodo === 'cash' ? 'cash' : 'banco', nota: txt('nota'), adultos: intOrNull(d.adultos), ninos: intOrNull(d.ninos), familia: String(d.familia) === 'true' };
+      upd = { fecha: d.fecha || null, de: txt('de'), importe: num('importe'), metodo: ['cash', 'directo'].includes(d.metodo) ? d.metodo : 'banco', nota: txt('nota'), adultos: intOrNull(d.adultos), ninos: intOrNull(d.ninos), familia: String(d.familia) === 'true' };
       if (!upd.de || !(upd.importe > 0)) return say('Pon de quién es y un importe mayor que cero.');
     } else {
-      upd = { nombre: txt('nombre'), categoria: txt('categoria'), proveedor: txt('proveedor'), notas: txt('notas'), previsto: num('previsto') ?? 0, final: num('final'), pago: ['cash', 'banco', 'mixto'].includes(d.pago) ? d.pago : null };
+      upd = { nombre: txt('nombre'), categoria: txt('categoria'), proveedor: txt('proveedor'), notas: txt('notas'), previsto: num('previsto') ?? 0, final: num('final'), pago: ['cash', 'banco', 'mixto'].includes(d.pago) ? d.pago : null, abierta: String(d.abierta) === 'true' };
       if (!upd.nombre) return say('La partida necesita un nombre.');
     }
     upd.editado = new Date().toISOString(); upd.editadoPor = S.uid;
@@ -993,8 +1110,8 @@ form.edit input,form.edit select{background:var(--surface)}
     if (ask) { S.confirm = ask.dataset.ask; const f = ask.closest('form.edit'); ask.outerHTML = delBtn(S.confirm); f && f.querySelector('[data-del]').focus(); return; }
     if (del && db) {
       const path = del.dataset.del, [col, id] = path.split('/');
-      const tipo = col === 'movimientos' ? 'movimiento' : col === 'regalos' ? 'regalo' : 'partida';
-      const old = (col === 'movimientos' ? S.movs : col === 'regalos' ? S.regalos : S.partidas).find(x => x.id === id);
+      const tipo = col === 'movimientos' ? 'movimiento' : col === 'regalos' ? 'regalo' : col === 'traspasos' ? 'traspaso' : 'partida';
+      const old = (col === 'movimientos' ? S.movs : col === 'regalos' ? S.regalos : col === 'traspasos' ? S.tras : S.partidas).find(x => x.id === id);
       try { await db.doc(path).delete(); log('borró', tipo, describe(tipo, old)); closeEdit(); } catch(err) { setSync('off', 'No se ha podido borrar'); }
       return;
     }
@@ -1017,7 +1134,7 @@ form.edit input,form.edit select{background:var(--surface)}
   let pendingImport = null;
   $('bkExport').addEventListener('click', () => {
     const strip = arr => Object.fromEntries(arr.map(({ id, ...rest }) => [id, rest]));
-    const data = { exportado: new Date().toISOString(), partidas: strip(S.partidas), movimientos: strip(S.movs), regalos: strip(S.regalos), ajustes: { general: S.ajustes } };
+    const data = { exportado: new Date().toISOString(), partidas: strip(S.partidas), movimientos: strip(S.movs), regalos: strip(S.regalos), traspasos: strip(S.tras), ajustes: { general: S.ajustes } };
     const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -1032,11 +1149,11 @@ form.edit input,form.edit select{background:var(--surface)}
     try {
       const data = JSON.parse(await file.text());
       const writes = [];
-      for (const c of ['partidas', 'movimientos', 'regalos', 'ajustes']) for (const [id, body] of Object.entries(data[c] || {})) if (body && typeof body === 'object') writes.push([c, id, body]);
+      for (const c of ['partidas', 'movimientos', 'regalos', 'traspasos', 'ajustes']) for (const [id, body] of Object.entries(data[c] || {})) if (body && typeof body === 'object') writes.push([c, id, body]);
       if (!writes.length) throw new Error('vacía');
       pendingImport = writes;
       const n = c => writes.filter(w => w[0] === c).length;
-      $('bkMsg').textContent = `La copia tiene ${n('partidas')} partidas, ${n('movimientos')} movimientos y ${n('regalos')} regalos.`;
+      $('bkMsg').textContent = `La copia tiene ${n('partidas')} partidas, ${n('movimientos')} movimientos, ${n('regalos')} regalos y ${n('traspasos')} ingresos de cash en Unicaja.`;
       $('bkConfirmWrap').innerHTML = `<button class="btn" type="button" id="bkConfirm">Cargar ${writes.length} filas</button><button class="btn ghost" type="button" id="bkCancel">Cancelar</button>`;
     } catch (err) { pendingImport = null; $('bkConfirmWrap').innerHTML = ''; flash('bkMsg', 'Ese archivo no es una copia válida del presupuesto.'); }
   });
@@ -1066,6 +1183,7 @@ form.edit input,form.edit select{background:var(--surface)}
     unsubs.push(db.collection('partidas').onSnapshot(s => { S.partidas = s.docs.map(d => ({ id: d.id, ...d.data() })); S.loaded.p = true; live(); render(); }, onErr));
     unsubs.push(db.collection('movimientos').onSnapshot(s => { S.movs = s.docs.map(d => ({ id: d.id, ...d.data() })); S.loaded.m = true; render(); }, onErr));
     unsubs.push(db.collection('regalos').onSnapshot(s => { S.regalos = s.docs.map(d => ({ id: d.id, ...d.data() })); S.loaded.r = true; render(); }, onErr));
+    unsubs.push(db.collection('traspasos').onSnapshot(s => { S.tras = s.docs.map(d => ({ id: d.id, ...d.data() })); render(); }, onErr));
     unsubs.push(db.collection('historial').orderBy('cuando', 'desc').limit(300).onSnapshot(s => { S.hist = s.docs.map(d => ({ id: d.id, ...d.data() })); renderFeed(); }, () => {}));
     unsubs.push(db.doc('ajustes/general').onSnapshot(s => { S.ajustes = s.exists ? s.data() : {}; render(); }, onErr));
   }
@@ -1107,7 +1225,7 @@ form.edit input,form.edit select{background:var(--surface)}
   if (/[?&]demo\b/.test(location.search)) {
     fetch('demo.json').then(r => r.json()).then(data => {
       const toArr = o => Object.entries(o || {}).map(([id, v]) => ({ id, ...v }));
-      S.partidas = toArr(data.partidas); S.movs = toArr(data.movimientos); S.regalos = toArr(data.regalos); S.ajustes = (data.ajustes || {}).general || {}; S.hist = toArr(data.historial).sort((a, b) => b.cuando.localeCompare(a.cuando));
+      S.partidas = toArr(data.partidas); S.movs = toArr(data.movimientos); S.regalos = toArr(data.regalos); S.tras = toArr(data.traspasos); S.ajustes = (data.ajustes || {}).general || {}; S.hist = toArr(data.historial).sort((a, b) => b.cuando.localeCompare(a.cuando));
       S.loaded = { p:true, m:true, r:true }; S.uid = 'demo';
       $('login').hidden = true; $('app').hidden = false; setSync('live', 'Vista previa'); render();
     });
