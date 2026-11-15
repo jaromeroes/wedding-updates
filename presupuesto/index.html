@@ -155,6 +155,7 @@ h1,h2,h3{margin:0;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
 .tag.cash{background:var(--cash-bg);color:var(--cash-ink)}
 .tag.banco{background:var(--bank-bg);color:var(--bank-ink)}
 .tag.fam{background:var(--brand-soft);color:var(--brand)}
+.tag.fuera{background:var(--idle-bg);color:var(--idle-ink)}
 .tag.mix{background:linear-gradient(90deg,var(--cash-bg) 50%,var(--bank-bg) 50%);color:var(--ink)}
 .cname .t .tag,.gname .tag{margin-left:8px;vertical-align:1px;font-size:11.5px;padding:2px 8px;font-weight:600}
 .tags{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
@@ -419,7 +420,7 @@ form.edit input,form.edit select{background:var(--surface)}
           <div class="acts"><button class="btn" type="submit">Añadir partida</button><span class="msg" id="pMsg" role="status"></span></div>
         </form>
       </details>
-      <p class="note">Toca una partida para editarla. El precio final, cuando lo hay, manda sobre el previsto. En un gasto abierto el coste es lo que se lleva pagado. Para crear una categoría, elige «Nueva categoría…» al añadir una partida.</p>
+      <p class="note">Toca una partida para editarla. El precio final, cuando lo hay, manda sobre el previsto. En un gasto abierto el coste es lo que se lleva pagado. Una partida «fuera de cuentas» se ve, pero no suma en los totales ni en la liquidación. Para crear una categoría, elige «Nueva categoría…» al añadir una partida.</p>
     </section>
 
     <!-- REGALOS -->
@@ -564,12 +565,16 @@ form.edit input,form.edit select{background:var(--surface)}
     });
     catList.forEach(c => c.items.sort((a,b) => (a.orden ?? 999) - (b.orden ?? 999) || a.nombre.localeCompare(b.nombre)));
     const sum = (arr, f) => arr.reduce((s, x) => s + (+f(x) || 0), 0);
-    const coste = sum(rows, r => r.coste), pagado = sum(S.movs, m => m.importe), pendiente = sum(rows, r => r.pendiente);
+    // partidas «fuera de cuentas» (p. ej. las alianzas, que se pagan aparte): se ven, pero no cuentan en totales ni liquidación
+    const fueraIds = new Set(rows.filter(r => r.fuera).map(r => r.id));
+    const cuenta = rows.filter(r => !r.fuera), movs = S.movs.filter(m => !fueraIds.has(m.partidaId));
+    const fuera = { coste: sum(rows.filter(r => r.fuera), r => r.coste), pagado: sum(S.movs.filter(m => fueraIds.has(m.partidaId)), m => m.importe), nombres: rows.filter(r => r.fuera).map(r => r.nombre) };
+    const coste = sum(cuenta, r => r.coste), pagado = sum(movs, m => m.importe), pendiente = sum(cuenta, r => r.pendiente);
     const regalos = sum(S.regalos, r => r.importe);
     const by = (arr, key) => arr.reduce((o, x) => (o[x[key] || '—'] = (o[x[key] || '—'] || 0) + (+x.importe || 0), o), {});
-    return { rows, catList, coste, pagado, pendiente, regalos, traspasos: sum(S.tras, t => t.importe),
-      pagMet: by(S.movs, 'metodo'), regMet: by(S.regalos, 'metodo'), pagador: S.movs.reduce((o, m) => (o[m.pagador || SIN] = (o[m.pagador || SIN] || 0) + (+m.importe || 0), o), {}),
-      regDe: S.movs.filter(m => m.pagador === REGALOS).reduce((o, m) => (o[m.regaloDe || 'sin especificar'] = (o[m.regaloDe || 'sin especificar'] || 0) + (+m.importe || 0), o), {}),
+    return { rows, cuenta, movs, fuera, catList, coste, pagado, pendiente, regalos, traspasos: sum(S.tras, t => t.importe),
+      pagMet: by(movs, 'metodo'), regMet: by(S.regalos, 'metodo'), pagador: movs.reduce((o, m) => (o[m.pagador || SIN] = (o[m.pagador || SIN] || 0) + (+m.importe || 0), o), {}),
+      regDe: movs.filter(m => m.pagador === REGALOS).reduce((o, m) => (o[m.regaloDe || 'sin especificar'] = (o[m.regaloDe || 'sin especificar'] || 0) + (+m.importe || 0), o), {}),
       budget: +S.ajustes.presupuesto || DEFAULT_BUDGET };
   }
 
@@ -608,11 +613,11 @@ form.edit input,form.edit select{background:var(--surface)}
   function renderHero(C){
     $('kNos').textContent = fmt(C.coste - C.regalos);
     $('kCoste').textContent = fmt(C.coste);
-    $('kCosteS').textContent = `${C.rows.length} partidas`;
+    $('kCosteS').textContent = `${C.cuenta.length} partidas`;
     $('kPagado').textContent = fmt(C.pagado);
     $('kPagadoS').textContent = C.coste ? `${Math.round(C.pagado / C.coste * 100)} % del coste` : '';
     $('kPend').textContent = fmt(C.pendiente);
-    const np = C.rows.filter(r => r.pendiente > 0.5).length;
+    const np = C.cuenta.filter(r => r.pendiente > 0.5).length;
     $('kPendS').textContent = `${np} ${np === 1 ? 'partida' : 'partidas'}`;
     $('kReg').textContent = fmt(C.regalos);
     $('kRegS').textContent = `${S.regalos.length} ${S.regalos.length === 1 ? 'regalo' : 'regalos'}`;
@@ -639,11 +644,11 @@ form.edit input,form.edit select{background:var(--surface)}
     const mixLine = n => { const o = met[n]; return o && o.cash > 0 && o.banco > 0 ? ` · ${fmt(o.cash)} cash + ${fmt(o.banco)} banco` : ''; };
     $('catTable').innerHTML = `<div class="lhead"><span>Categoría</span><span class="r hide-m">Previsto</span><span class="r hide-m">Pagado</span><span class="r">Pendiente</span></div>` +
       C.catList.map(c => `<button class="crow" type="button" data-goto="${esc(c.nombre)}">
-        <span class="cname"><span class="t">${esc(c.nombre)}${metTag(c.nombre)}</span><span class="s">${c.items.length} ${c.items.length === 1 ? 'partida' : 'partidas'}${esc(mixLine(c.nombre))}<span class="show-m" style="display:inline"> · ${esc(fmt(c.pagado))} de ${esc(fmt(c.coste))}</span></span>${pbar(c.pagado, c.coste)}</span>
+        <span class="cname"><span class="t">${esc(c.nombre)}${c.items.every(r => r.fuera) ? '<span class="tag fuera">Fuera de cuentas</span>' : metTag(c.nombre)}</span><span class="s">${c.items.length} ${c.items.length === 1 ? 'partida' : 'partidas'}${esc(mixLine(c.nombre))}<span class="show-m" style="display:inline"> · ${esc(fmt(c.pagado))} de ${esc(fmt(c.coste))}</span></span>${pbar(c.pagado, c.coste)}</span>
         <span class="cnum num hide-m">${fmt(c.coste)}</span>
         <span class="cnum num hide-m">${fmt(c.pagado)}</span>
         ${pill(c)}</button>`).join('') +
-      `<div class="ltotal"><span>Total</span><span class="cnum num hide-m">${fmt(C.coste)}</span><span class="cnum num hide-m">${fmt(C.pagado)}</span><span class="cnum num">${fmt(C.pendiente)}</span></div>`;
+      `<div class="ltotal"><span>Total</span><span class="cnum num hide-m">${fmt(C.coste)}</span><span class="cnum num hide-m">${fmt(C.pagado)}</span><span class="cnum num">${fmt(C.pendiente)}</span></div>` + (C.fuera.coste || C.fuera.pagado ? `<div class="lrow" style="cursor:default;padding-left:18px;min-height:0;color:var(--muted);font-size:13.5px"><span>Fuera de cuentas (${esc(C.fuera.nombres.join(', '))}): no entra en los totales ni en la liquidación</span><span class="cnum num hide-m">${fmt(C.fuera.coste)}</span><span class="cnum num hide-m">${fmt(C.fuera.pagado)}</span><span></span></div>` : '');
     // .show-m inline override only applies on mobile
     if (!matchMedia('(max-width: 640px)').matches) $$('#catTable .show-m').forEach(el => el.style.display = 'none');
   }
@@ -712,7 +717,7 @@ form.edit input,form.edit select{background:var(--surface)}
     const st = (lab, val, sub, color) => `<div class="stat"><span class="lab">${lab}</span><span class="val num"${color ? ` style="color:${color}"` : ''}>${val}</span><span class="sub">${sub}</span></div>`;
     $('liqKpis').innerHTML =
       st('Recibido', fmt(L.recibido), L.aportan.length ? `regalos + lo que pagan ${L.aportan.map(a => a[0]).join(' y ')}` : `${S.regalos.length} regalos`) +
-      st('Pagado', fmt(C.pagado), `${S.movs.length} movimientos`) +
+      st('Pagado', fmt(C.pagado), `${C.movs.length} movimientos`) +
       st(L.neto >= 0 ? 'Sobra' : 'Ponemos nosotros', fmt(Math.abs(L.neto)), 'Recibido − pagado', L.neto >= 0 ? 'var(--pos)' : 'var(--danger)') +
       st('Ahora mismo hay', `${fmt(Math.max(L.cashMano, 0))} cash`, L.saldoUni >= 0 ? `y ${fmt(L.saldoUni)} a favor en Unicaja` : `y ${fmt(-L.saldoUni)} de deuda en Unicaja`);
     const fuente = p => [p.cash > 0.5 && `<span class="tag cash">${esc(fmt(p.cash))} de cash</span>`, p.uni > 0.5 && `<span class="tag banco">${esc(fmt(p.uni))} desde Unicaja</span>`].filter(Boolean).join('');
@@ -730,6 +735,7 @@ form.edit input,form.edit select{background:var(--surface)}
     if (L.sobraCash > 0.5 || L.sobraUni > 0.5) notes.push(`Después de liquidar sobran ${[L.sobraCash > 0.5 && fmt(L.sobraCash) + ' en cash', L.sobraUni > 0.5 && fmt(L.sobraUni) + ' en Unicaja'].filter(Boolean).join(' y ')}.`);
     if (L.plan.some(p => p.falta > 0.5)) notes.push('Lo recibido no llega para devolverlo todo: a cada persona se le devuelve la misma proporción de lo que puso, y lo que queda sin cubrir es lo que pone cada uno.');
     if (L.aportan.length) notes.push(`No se devuelve lo que han pagado ${L.aportan.map(([n, v]) => `${n} (${fmt(v)})`).join(' y ')}: cuenta como su aportación.`);
+    if (C.fuera.pagado > 0.5) notes.push(`Fuera de cuentas: ${C.fuera.nombres.join(', ')} (${fmt(C.fuera.pagado)} pagados) se paga aparte y no entra aquí.`);
     if (L.sinAsignar > 0.5) notes.push(`Hay ${fmt(L.sinAsignar)} en movimientos sin decir quién pagó; no entran en la liquidación hasta que se asignen.`);
     if (L.cashMano < -0.5) notes.push(`Ojo: sale más cash del que ha llegado en regalos (${fmt(-L.cashMano)} de más).`);
     $('liqNote').textContent = notes.join(' ');
@@ -741,6 +747,7 @@ form.edit input,form.edit select{background:var(--surface)}
       : `<p class="note">Todavía no se ha apuntado ningún ingreso de cash en Unicaja.</p>`;
   }
 
+  const fueraP = id => !!(S.partidas.find(x => x.id === id) || {}).fuera;
   function partidaName(id){ const p = S.partidas.find(x => x.id === id); return p ? p.nombre : 'Partida borrada'; }
 
   // ---------- inline editing ----------
@@ -800,6 +807,7 @@ form.edit input,form.edit select{background:var(--surface)}
     {name:'previsto', label:'Previsto (€)', type:'number'},
     {name:'final', label:'Precio final (€)', type:'number', ph:'Sin cerrar'},
     {name:'abierta', label:'Tipo de gasto', type:'select', options: v => `<option value="false"${String(v) !== 'true' ? ' selected' : ''}>Con precio</option><option value="true"${String(v) === 'true' ? ' selected' : ''}>Abierto (lo que se pague)</option>`},
+    {name:'fuera', label:'¿Cuenta en las cuentas?', type:'select', options: v => `<option value="false"${String(v) !== 'true' ? ' selected' : ''}>Sí</option><option value="true"${String(v) === 'true' ? ' selected' : ''}>No, fuera de cuentas</option>`},
     {name:'pago', label:'Forma de pago', type:'select', options: v => [['', 'Según los pagos'], ['cash', 'Cash'], ['banco', 'Banco'], ['mixto', 'Mixto']].map(([k, l]) => `<option value="${k}"${(v || '') === k ? ' selected' : ''}>${l}</option>`).join('')},
     {name:'notas', label:'Notas', span:true},
   ];
@@ -827,7 +835,7 @@ form.edit input,form.edit select{background:var(--surface)}
         const sub = [pagLabel(m), m.nota, who].filter(Boolean).join(' · ');
         return `<button class="trow" type="button" data-row="${esc(path)}">
           <span class="tmain"><span class="t">${esc(partidaName(m.partidaId))}</span><span class="s">${esc(sub)}</span></span>
-          <span class="tags"><span class="tag ${m.metodo === 'cash' ? 'cash' : 'banco'}">${m.metodo === 'cash' ? 'Cash' : 'Banco'}</span></span>
+          <span class="tags">${fueraP(m.partidaId) ? '<span class="tag fuera">Fuera</span>' : ''}<span class="tag ${m.metodo === 'cash' ? 'cash' : 'banco'}">${m.metodo === 'cash' ? 'Cash' : 'Banco'}</span></span>
           <span class="tamt num">${fmt2(m.importe)}</span></button>`;
       }).join('')).join('') +
       `<div class="rtotal"><span>Total${fp || fm || fw ? ' filtrado' : ''}</span><span class="num">${fmt2(total)}</span></div>`;
@@ -842,20 +850,20 @@ form.edit input,form.edit select{background:var(--surface)}
       C.catList.map(c => {
         const open = !S.collapsed.has(c.nombre);
         return `<div id="g-${slug(c.nombre)}"><button class="ghead" type="button" data-toggle="${esc(c.nombre)}" aria-expanded="${open}">
-          <span class="gname">${CARET}<span>${esc(c.nombre)}</span>${pagoTag(pagoCat(c.items))}</span>
+          <span class="gname">${CARET}<span>${esc(c.nombre)}</span>${c.items.every(r => r.fuera) ? '<span class="tag fuera">Fuera de cuentas</span>' : pagoTag(pagoCat(c.items))}</span>
           <span class="cnum num hide-m">${fmt(c.coste)}</span><span class="cnum num hide-m">${fmt(c.pagado)}</span>${pill(c)}</button>` +
           (open ? c.items.map(r => {
             const path = 'partidas/' + r.id;
             if (S.editing === path) return editBlock(path, PAR_FIELDS, !hasMov.has(r.id), 'Tiene movimientos: bórralos antes para poder borrar la partida.');
             const sub = [r.proveedor, r.notas].filter(Boolean).join(' · ');
             return `<button class="lrow" type="button" data-row="${esc(path)}">
-              <span class="cname"><span class="t">${esc(r.nombre)}${pagoTag(pagoDe(r))}</span>${sub ? `<span class="s">${esc(sub)}</span>` : ''}<span class="s show-m">${esc(fmt(r.pagado))} de ${esc(fmt(r.coste))}${r.final != null && r.final !== '' ? ' (final)' : ''}</span>${pbar(r.pagado, r.coste)}</span>
+              <span class="cname"><span class="t">${esc(r.nombre)}${r.fuera ? '<span class="tag fuera">Fuera de cuentas</span>' : pagoTag(pagoDe(r))}</span>${sub ? `<span class="s">${esc(sub)}</span>` : ''}<span class="s show-m">${esc(fmt(r.pagado))} de ${esc(fmt(r.coste))}${r.final != null && r.final !== '' ? ' (final)' : ''}</span>${pbar(r.pagado, r.coste)}</span>
               <span class="cnum num hide-m">${fmt(r.coste)}${r.final != null && r.final !== '' ? '<small>precio final</small>' : ''}</span>
               <span class="cnum num hide-m">${fmt(r.pagado)}</span>
               ${pill(r)}</button>`;
           }).join('') : '') + `</div>`;
       }).join('') +
-      `<div class="ltotal"><span>Total</span><span class="cnum num hide-m">${fmt(C.coste)}</span><span class="cnum num hide-m">${fmt(C.pagado)}</span><span class="cnum num">${fmt(C.pendiente)}</span></div>`;
+      `<div class="ltotal"><span>Total</span><span class="cnum num hide-m">${fmt(C.coste)}</span><span class="cnum num hide-m">${fmt(C.pagado)}</span><span class="cnum num">${fmt(C.pendiente)}</span></div>` + (C.fuera.coste || C.fuera.pagado ? `<div class="lrow" style="cursor:default;padding-left:18px;min-height:0;color:var(--muted);font-size:13.5px"><span>Fuera de cuentas (${esc(C.fuera.nombres.join(', '))}): no entra en los totales ni en la liquidación</span><span class="cnum num hide-m">${fmt(C.fuera.coste)}</span><span class="cnum num hide-m">${fmt(C.fuera.pagado)}</span><span></span></div>` : '');
   }
 
   function personas(r){
@@ -914,7 +922,7 @@ form.edit input,form.edit select{background:var(--surface)}
   const DIFF = {
     movimiento: { partidaId: ['partida', v => partidaName(v)], importe: ['importe', v => fmt2(v)], fecha: ['mes', fDate], metodo: ['cómo', metodoTxt], pagador: ['quién paga', v => v || SIN], regaloDe: ['de qué regalo', v => v || '—'], nota: ['nota', v => v || '—'] },
     regalo: { de: ['de parte de', v => v || '—'], importe: ['importe', v => fmt2(v)], fecha: ['mes', fDate], metodo: ['cómo', metodoTxt], adultos: ['adultos', v => v ?? '—'], ninos: ['niños', v => v ?? '—'], familia: ['de los padres', v => v ? 'sí' : 'no'], nota: ['nota', v => v || '—'] },
-    partida: { nombre: ['nombre', v => v || '—'], categoria: ['categoría', v => v || '—'], proveedor: ['proveedor', v => v || '—'], previsto: ['previsto', v => fmt(v)], final: ['precio final', v => v == null || v === '' ? 'sin cerrar' : fmt(v)], abierta: ['gasto abierto', v => v ? 'sí' : 'no'], notas: ['notas', v => v || '—'], pago: ['forma de pago', v => ({ cash: 'cash', banco: 'banco', mixto: 'mixto' })[v] || 'según los pagos'] },
+    partida: { nombre: ['nombre', v => v || '—'], categoria: ['categoría', v => v || '—'], proveedor: ['proveedor', v => v || '—'], previsto: ['previsto', v => fmt(v)], final: ['precio final', v => v == null || v === '' ? 'sin cerrar' : fmt(v)], abierta: ['gasto abierto', v => v ? 'sí' : 'no'], fuera: ['fuera de cuentas', v => v ? 'sí' : 'no'], notas: ['notas', v => v || '—'], pago: ['forma de pago', v => ({ cash: 'cash', banco: 'banco', mixto: 'mixto' })[v] || 'según los pagos'] },
   };
   function diffText(tipo, a, b){
     const map = DIFF[tipo] || {};
@@ -1103,7 +1111,7 @@ form.edit input,form.edit select{background:var(--surface)}
       upd = { fecha: d.fecha || null, de: txt('de'), importe: num('importe'), metodo: ['cash', 'directo'].includes(d.metodo) ? d.metodo : 'banco', nota: txt('nota'), adultos: intOrNull(d.adultos), ninos: intOrNull(d.ninos), familia: String(d.familia) === 'true' };
       if (!upd.de || !(upd.importe > 0)) return say('Pon de quién es y un importe mayor que cero.');
     } else {
-      upd = { nombre: txt('nombre'), categoria: txt('categoria'), proveedor: txt('proveedor'), notas: txt('notas'), previsto: num('previsto') ?? 0, final: num('final'), pago: ['cash', 'banco', 'mixto'].includes(d.pago) ? d.pago : null, abierta: String(d.abierta) === 'true' };
+      upd = { nombre: txt('nombre'), categoria: txt('categoria'), proveedor: txt('proveedor'), notas: txt('notas'), previsto: num('previsto') ?? 0, final: num('final'), pago: ['cash', 'banco', 'mixto'].includes(d.pago) ? d.pago : null, abierta: String(d.abierta) === 'true', fuera: String(d.fuera) === 'true' };
       if (!upd.nombre) return say('La partida necesita un nombre.');
     }
     upd.editado = new Date().toISOString(); upd.editadoPor = S.uid;
@@ -1234,6 +1242,9 @@ form.edit input,form.edit select{background:var(--surface)}
       b.set(db.doc('traspasos/cash-a-unicaja-5000'), { importe: 5000, de: 'cash', a: UNICAJA, fecha: '2026-11', nota: 'Cash de los regalos ingresado en Unicaja',
         creado: new Date().toISOString(), creadoPor: S.uid });
       b.update(db.doc('regalos/r03'), { metodo: 'directo' });
+    } },
+    { id: '2026-11-16-alianzas-fuera', texto: 'las alianzas como fuera de cuentas: se ven, pero no cuentan en los totales ni en la liquidación', run: async b => {
+      (await db.collection('partidas').where('categoria', '==', 'Alianzas').get()).docs.forEach(doc => b.update(doc.ref, { fuera: true }));
     } },
     { id: '2026-11-15-pagadores', texto: 'los pagadores: solo Jose, Oarda, Unicaja, B2B Tinkkers o Regalos (con de qué regalo sale)', run: async b => {
       (await db.collection('movimientos').get()).docs.forEach(doc => {
