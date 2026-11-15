@@ -1187,6 +1187,32 @@ form.edit input,form.edit select{background:var(--surface)}
     unsubs.push(db.collection('historial').orderBy('cuando', 'desc').limit(300).onSnapshot(s => { S.hist = s.docs.map(d => ({ id: d.id, ...d.data() })); renderFeed(); }, () => {}));
     unsubs.push(db.doc('ajustes/general').onSnapshot(s => { S.ajustes = s.exists ? s.data() : {}; render(); }, onErr));
   }
+  // Cambios puntuales de datos pedidos fuera de la app: se aplican una sola vez al entrar (marca en ajustes/migraciones)
+  // y solo tocan los campos indicados.
+  const MIGRACIONES = [
+    { id: '2026-11-15-viaje-y-traspaso', texto: 'los cambios del 15/11: Gastos del viaje en Luna de miel, parkings movidos, 5.000 € de cash a Unicaja y regalo directo de Madre de Jose', run: b => {
+      b.set(db.doc('partidas/viaje-novios-gastos'), { nombre: 'Gastos del viaje', categoria: 'Luna de miel', proveedor: '', previsto: 0, final: null, abierta: true,
+        notas: 'Todo lo que no sea vuelos ni hotel', orden: 28, creado: new Date().toISOString(), creadoPor: S.uid }, { merge: true });
+      b.update(db.doc('movimientos/S3q3NYoU8Q0gMHSBj00K'), { partidaId: 'viaje-novios-gastos' });
+      b.update(db.doc('movimientos/ke42HRf2tfzlcVzfyD89'), { partidaId: 'viaje-novios-gastos' });
+      b.set(db.doc('traspasos/cash-a-unicaja-5000'), { importe: 5000, de: 'cash', a: UNICAJA, fecha: '2026-11', nota: 'Cash de los regalos ingresado en Unicaja',
+        creado: new Date().toISOString(), creadoPor: S.uid });
+      b.update(db.doc('regalos/r03'), { metodo: 'directo' });
+    } },
+  ];
+  async function migrar(){
+    try {
+      const ref = db.doc('ajustes/migraciones'), hechas = (await ref.get()).data() || {};
+      for (const m of MIGRACIONES) {
+        if (hechas[m.id]) continue;
+        const b = db.batch(); m.run(b);
+        b.set(ref, { [m.id]: { cuando: new Date().toISOString(), quien: S.uid } }, { merge: true });
+        await b.commit();
+        log('aplicó', 'cambios', m.texto);
+      }
+    } catch(e) { setSync('off', 'No se han podido aplicar los cambios pendientes'); }
+  }
+
   function start(){
     const cfg = window.FIREBASE_CONFIG || {};
     if (!window.firebase || !cfg.apiKey) {
@@ -1203,7 +1229,7 @@ form.edit input,form.edit select{background:var(--surface)}
         $$('.js-who').forEach(el => el.textContent = cap(S.uid));
         $$('.js-avatar').forEach(el => el.textContent = (S.uid[0] || '?').toUpperCase());
         $('login').hidden = true; $('app').hidden = false;
-        listen();
+        listen(); migrar();
       } else {
         stopAll();
         $('app').hidden = true; $('login').hidden = false;
