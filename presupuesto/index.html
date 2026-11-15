@@ -688,29 +688,32 @@ form.edit input,form.edit select{background:var(--surface)}
   // ingresado − lo que Unicaja ha pagado; si es negativo, es deuda). Los regalos «directo al proveedor» no entran en
   // ninguna bolsa, y lo que pagan B2B Tinkkers o un regalo directo no se devuelve. Quien pagó de su bolsillo (Jose,
   // Oarda…) tiene que cobrarlo. Primero se tapa la deuda de Unicaja con cash; luego se devuelve a cada persona, con el cash que
-  // quede y después desde Unicaja. Si no llega para todos, a cada uno se le devuelve la misma proporción.
+  // quede y después desde Unicaja. Si no llega para todos, lo que falta lo ponen a partes iguales (50 % cada uno).
   function liquidacion(C){
     const rc = C.regMet.cash || 0, rb = C.regMet.banco || 0;
     const cashMano = rc - (C.regDe[CASH_REGALOS] || 0) - C.traspasos;
     const saldoUni = rb + C.traspasos - (C.pagador[UNICAJA] || 0);
     const sinAsignar = C.pagador[SIN] || 0;
     const aportan = [...(C.pagador[B2B] ? [[B2B, C.pagador[B2B]]] : []), ...Object.entries(C.regDe).filter(([d]) => d !== CASH_REGALOS)];
-    const personas = Object.entries(C.pagador).filter(([n, v]) => v > 0.005 && ![UNICAJA, REGALOS, B2B, SIN].includes(n)).sort((a, b) => b[1] - a[1]);
+    // Jose y Oarda siempre entran (a partes iguales), aunque uno no haya pagado nada
+    const personas = Object.entries({ Jose: 0, Oarda: 0, ...C.pagador }).filter(([n]) => ![UNICAJA, REGALOS, B2B, SIN].includes(n)).sort((a, b) => b[1] - a[1]);
     let cash = Math.max(cashMano, 0), uni = Math.max(saldoUni, 0);
     const plan = [];
     const deudaUni = Math.max(-saldoUni, 0);
     if (deudaUni > 0.005) { const x = Math.min(cash, deudaUni); cash -= x; plan.push({ quien: UNICAJA, debe: deudaUni, cash: x, uni: 0, falta: deudaUni - x }); }
     const T = personas.reduce((s, [, v]) => s + v, 0);
-    const ratio = T > 0 ? Math.min(1, (cash + uni) / T) : 1;
+    const parte = personas.length ? Math.max(T - cash - uni, 0) / personas.length : 0;
+    // quien pagó menos que su parte pone la diferencia (otro), y eso completa lo que se devuelve a los demás
     for (const [quien, v] of personas) {
-      let a = v * ratio;
+      let a = v - parte;
+      if (a < 0) { plan.push({ quien, debe: v, cash: 0, uni: 0, otro: 0, pone: -a, falta: 0, parte }); continue; }
       const x = Math.min(cash, a); cash -= x; a -= x;
-      const y = Math.min(uni, a); uni -= y;
-      plan.push({ quien, debe: v, cash: x, uni: y, falta: v - x - y });
+      const y = Math.min(uni, a); uni -= y; a -= y;
+      plan.push({ quien, debe: v, cash: x, uni: y, otro: a, falta: 0, parte });
     }
     // recibido = regalos que han llegado a cash o a Unicaja + lo pagado por quienes aportan (incluye los regalos directos)
     const recibido = rc + rb + aportan.reduce((s, [, v]) => s + v, 0);
-    return { cashMano, saldoUni, sinAsignar, aportan, plan, sobraCash: cash, sobraUni: uni, recibido, neto: recibido - C.pagado };
+    return { cashMano, saldoUni, sinAsignar, aportan, plan, parte, personas: personas.length, sobraCash: cash, sobraUni: uni, recibido, neto: recibido - C.pagado };
   }
   function renderLiq(C){
     const L = liquidacion(C);
@@ -720,20 +723,23 @@ form.edit input,form.edit select{background:var(--surface)}
       st('Pagado', fmt(C.pagado), `${C.movs.length} movimientos`) +
       st(L.neto >= 0 ? 'Sobra' : 'Ponemos nosotros', fmt(Math.abs(L.neto)), 'Recibido − pagado', L.neto >= 0 ? 'var(--pos)' : 'var(--danger)') +
       st('Ahora mismo hay', `${fmt(Math.max(L.cashMano, 0))} cash`, L.saldoUni >= 0 ? `y ${fmt(L.saldoUni)} a favor en Unicaja` : `y ${fmt(-L.saldoUni)} de deuda en Unicaja`);
-    const fuente = p => [p.cash > 0.5 && `<span class="tag cash">${esc(fmt(p.cash))} de cash</span>`, p.uni > 0.5 && `<span class="tag banco">${esc(fmt(p.uni))} desde Unicaja</span>`].filter(Boolean).join('');
-    const rows = L.plan.filter(p => p.debe > 0.5).map(p => {
-      const pagar = p.cash + p.uni;
-      const sub = p.quien === UNICAJA ? `Le debemos ${fmt(p.debe)}` : `Ha pagado ${fmt(p.debe)} de su bolsillo`;
-      const falta = p.falta > 0.5 ? ` · ${p.quien === UNICAJA ? 'quedan' : 'pone'} ${fmt(p.falta)} sin cubrir` : '';
+    const ponen = L.plan.filter(p => p.pone > 0.5).map(p => p.quien).join(' y ');
+    const fuente = p => [p.cash > 0.5 && `<span class="tag cash">${esc(fmt(p.cash))} de cash</span>`, p.uni > 0.5 && `<span class="tag banco">${esc(fmt(p.uni))} desde Unicaja</span>`,
+      p.otro > 0.5 && `<span class="tag fam">${esc(fmt(p.otro))} de ${esc(ponen)}</span>`].filter(Boolean).join('');
+    const rows = L.plan.filter(p => p.debe > 0.5 || p.pone > 0.5).map(p => {
+      const uniRow = p.quien === UNICAJA;
+      const sub = uniRow ? `Le debemos ${fmt(p.debe)}${p.falta > 0.5 ? ` · quedan ${fmt(p.falta)} sin cubrir` : ''}`
+        : `Ha pagado ${fmt(p.debe)} · su parte (${Math.round(100 / L.personas)} %) es ${fmt(p.parte)}`;
+      const title = uniRow ? 'Pagar a Unicaja' : p.pone ? `${esc(p.quien)} tiene que poner` : `Devolver a ${esc(p.quien)}`;
       return `<div class="trow" style="cursor:default">
-        <span class="tmain"><span class="t">${p.quien === UNICAJA ? 'Pagar a Unicaja' : `Devolver a ${esc(p.quien)}`}</span><span class="s">${esc(sub + falta)}</span></span>
-        <span class="tags">${fuente(p)}</span>
-        <span class="tamt num">${fmt(pagar)}</span></div>`;
+        <span class="tmain"><span class="t">${title}</span><span class="s">${esc(sub)}</span></span>
+        <span class="tags">${p.pone ? '<span class="tag fam">Para completar las devoluciones</span>' : fuente(p)}</span>
+        <span class="tamt num">${fmt(p.pone || p.cash + p.uni + (p.otro || 0))}</span></div>`;
     }).join('');
     $('liqPlan').innerHTML = rows || `<div class="empty">No hay nada que devolver: nadie ha pagado de su bolsillo ni hay deuda con Unicaja.</div>`;
     const notes = [];
     if (L.sobraCash > 0.5 || L.sobraUni > 0.5) notes.push(`Después de liquidar sobran ${[L.sobraCash > 0.5 && fmt(L.sobraCash) + ' en cash', L.sobraUni > 0.5 && fmt(L.sobraUni) + ' en Unicaja'].filter(Boolean).join(' y ')}.`);
-    if (L.plan.some(p => p.falta > 0.5)) notes.push('Lo recibido no llega para devolverlo todo: a cada persona se le devuelve la misma proporción de lo que puso, y lo que queda sin cubrir es lo que pone cada uno.');
+    if (L.parte > 0.5) notes.push(`Lo recibido no llega para devolverlo todo: los ${fmt(L.parte * L.personas)} que faltan los ponemos a partes iguales, ${fmt(L.parte)} cada uno, y a cada uno se le devuelve lo que pagó por encima de su parte.`);
     if (L.aportan.length) notes.push(`No se devuelve lo que han pagado ${L.aportan.map(([n, v]) => `${n} (${fmt(v)})`).join(' y ')}: cuenta como su aportación.`);
     if (C.fuera.pagado > 0.5) notes.push(`Fuera de cuentas: ${C.fuera.nombres.join(', ')} (${fmt(C.fuera.pagado)} pagados) se paga aparte y no entra aquí.`);
     if (L.sinAsignar > 0.5) notes.push(`Hay ${fmt(L.sinAsignar)} en movimientos sin decir quién pagó; no entran en la liquidación hasta que se asignen.`);
