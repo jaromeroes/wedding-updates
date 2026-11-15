@@ -178,6 +178,9 @@ h1,h2,h3{margin:0;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
 .sbar{height:8px;border-radius:999px;background:var(--bar-bg);overflow:hidden}
 .sbar i{display:block;height:100%;border-radius:999px}
 .big{font-size:22px;font-weight:700}
+.slink{width:100%;border:0;background:none;padding:5px 8px;margin:0 -8px;width:calc(100% + 16px);border-radius:8px;cursor:pointer;text-align:left;min-height:36px}
+.slink:hover{background:var(--surface2)}
+.slink.child{padding-left:24px;font-size:13px;color:var(--muted)}
 .sublab{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 
 /* ---------- forms ---------- */
@@ -382,7 +385,8 @@ form.edit input,form.edit select{background:var(--surface)}
               <label><input type="radio" name="mMetodo" id="mCash" value="cash"><span>Cash</span></label>
               <label><input type="radio" name="mMetodo" id="mBanco" value="banco" checked><span>Banco</span></label>
             </div></div>
-          <label for="mPagador">Quién paga<input id="mPagador" list="pagadores" required placeholder="Jose, Oarda…"></label>
+          <label for="mPagador">Quién paga<select id="mPagador" required></select></label>
+          <label for="mRegaloDe" id="mRegaloWrap" hidden>De qué regalo<input id="mRegaloDe" list="regalosDe" placeholder="Cash de regalos, Madre de Jose…"></label>
           <label for="mNota" class="span2">Nota<input id="mNota" placeholder="Señal, segundo pago…"></label>
           <div class="acts"><button class="btn" type="submit">Añadir movimiento</button><span class="msg" id="mMsg" role="status"></span></div>
         </form>
@@ -456,7 +460,7 @@ form.edit input,form.edit select{background:var(--surface)}
       <p class="note">El historial guarda quién añade, cambia o borra cada cosa desde que existe esta sección; lo apuntado antes no aparece aquí.</p>
     </section>
 
-    <datalist id="pagadores"></datalist>
+    <datalist id="regalosDe"></datalist>
     <datalist id="categorias"></datalist>
   </main>
 
@@ -479,8 +483,20 @@ form.edit input,form.edit select{background:var(--surface)}
   const DEFAULT_BUDGET = 30000;
   const GIFT_CASH = 'Pagado con ingresos por regalo · cash';
   const UNICAJA = 'Unicaja';
-  // pagadores que aportan y no se les devuelve (la empresa, o quien paga directamente con cargo a su regalo)
-  const NO_DEVOLVER = ['B2B Tinkkers', 'Madre de Jose'];
+  // Quién paga es siempre uno de estos. «Regalos» lleva además de qué regalo sale (regaloDe): el cash de los regalos
+  // o alguien que paga directamente con cargo a su regalo (Madre de Jose…). B2B Tinkkers aporta y no se le devuelve.
+  const REGALOS = 'Regalos', CASH_REGALOS = 'Cash de regalos', B2B = 'B2B Tinkkers', SIN = 'Sin asignar';
+  const PAGADORES = ['Jose', 'Oarda', UNICAJA, B2B, REGALOS];
+  // pasa los pagadores antiguos de texto libre al esquema de arriba
+  function normPag(m){
+    const p = String(m.pagador || '').trim();
+    if (!p || p.toLowerCase() === SIN.toLowerCase()) return { ...m, pagador: '', regaloDe: '' };
+    if (p === GIFT_CASH) return { ...m, pagador: REGALOS, regaloDe: CASH_REGALOS };
+    const known = PAGADORES.find(x => slug(x) === slug(p));
+    if (known) return { ...m, pagador: known, regaloDe: known === REGALOS ? (m.regaloDe || '') : '' };
+    return { ...m, pagador: REGALOS, regaloDe: p };
+  }
+  const pagLabel = m => m.pagador === REGALOS ? `${REGALOS} · ${m.regaloDe || 'sin especificar'}` : (m.pagador || SIN);
   const eur = new Intl.NumberFormat('es-ES', {style:'currency', currency:'EUR', maximumFractionDigits:0, useGrouping:'always'});
   const eur2 = new Intl.NumberFormat('es-ES', {style:'currency', currency:'EUR', minimumFractionDigits:2, maximumFractionDigits:2, useGrouping:'always'});
   const fmt = n => eur.format(Math.round(n || 0));
@@ -552,7 +568,8 @@ form.edit input,form.edit select{background:var(--surface)}
     const regalos = sum(S.regalos, r => r.importe);
     const by = (arr, key) => arr.reduce((o, x) => (o[x[key] || '—'] = (o[x[key] || '—'] || 0) + (+x.importe || 0), o), {});
     return { rows, catList, coste, pagado, pendiente, regalos, traspasos: sum(S.tras, t => t.importe),
-      pagMet: by(S.movs, 'metodo'), regMet: by(S.regalos, 'metodo'), pagador: by(S.movs, 'pagador'),
+      pagMet: by(S.movs, 'metodo'), regMet: by(S.regalos, 'metodo'), pagador: S.movs.reduce((o, m) => (o[m.pagador || SIN] = (o[m.pagador || SIN] || 0) + (+m.importe || 0), o), {}),
+      regDe: S.movs.filter(m => m.pagador === REGALOS).reduce((o, m) => (o[m.regaloDe || 'sin especificar'] = (o[m.regaloDe || 'sin especificar'] || 0) + (+m.importe || 0), o), {}),
       budget: +S.ajustes.presupuesto || DEFAULT_BUDGET };
   }
 
@@ -640,8 +657,8 @@ form.edit input,form.edit select{background:var(--surface)}
     $('methodSplit').innerHTML =
       `<span class="sublab">Pagos</span>` + sline('Cash', pc, max, 'var(--cash-ink)') + sline('Banco', pb, max, 'var(--bank-ink)') +
       `<span class="sublab" style="margin-top:4px">Regalos</span>` + sline('Cash', rc, max, 'var(--cash-ink)') + sline('Banco', rb, max, 'var(--bank-ink)');
-    // cash gifts are spent directly ("Pagado con ingresos por regalo · cash"); bank gifts go to Unicaja
-    const giftCashSpent = C.pagador[GIFT_CASH] || 0, tras = C.traspasos;
+    // cash gifts are spent directly (Regalos · Cash de regalos); bank gifts go to Unicaja
+    const giftCashSpent = C.regDe[CASH_REGALOS] || 0, tras = C.traspasos;
     const bal = rc - giftCashSpent - tras;
     $('cashNote').textContent = bal >= 0
       ? `Efectivo de regalos: han llegado ${fmt(rc)}, se han gastado ${fmt(giftCashSpent)}${tras ? `, se han ingresado ${fmt(tras)} en Unicaja` : ''} y quedan ${fmt(bal)} en mano.`
@@ -651,25 +668,29 @@ form.edit input,form.edit select{background:var(--surface)}
     $('unicajaSplit').innerHTML = sline('Ha adelantado', uni, umax, 'var(--bar)') + sline('Regalos por banco', rb, umax, 'var(--bank-ink)') +
       (tras ? sline('Cash ingresado', tras, umax, 'var(--cash-ink)') : '') +
       `<div class="sline" style="margin-top:4px"><span style="font-weight:600">${deuda >= 0 ? 'Le debemos' : 'A nuestro favor'}</span><span></span><span class="num big" style="color:${deuda > 0.5 ? 'var(--danger)' : 'var(--pos)'}">${fmt(Math.abs(deuda))}</span></div>`;
+    // cada línea lleva a Movimientos filtrado por ese pagador; Regalos se desglosa por regalo
     const payers = Object.entries(C.pagador).sort((a,b) => b[1] - a[1]);
     const pmax = Math.max(...payers.map(p => p[1]), 1);
-    $('payerSplit').innerHTML = payers.length ? payers.map(([n, v]) => sline(n, v, pmax, 'var(--bar)')).join('') : '<p class="note">Todavía no hay pagos.</p>';
+    const link = (val, html, child) => `<button class="slink${child ? ' child' : ''}" type="button" data-pagador="${esc(val)}" title="Ver los pagos">${html}</button>`;
+    $('payerSplit').innerHTML = payers.length ? payers.map(([n, v]) =>
+      link(n === SIN ? '__none' : n, sline(n, v, pmax, n === SIN ? 'var(--danger)' : 'var(--bar)')) +
+      (n === REGALOS ? Object.entries(C.regDe).sort((a, b) => b[1] - a[1]).map(([d, x]) => link(REGALOS + '::' + d, sline(d, x, pmax, 'var(--bank-ink)'), true)).join('') : '')
+    ).join('') : '<p class="note">Todavía no hay pagos.</p>';
   }
 
   // ---------- liquidación ----------
   // Hay dos bolsas de dinero: el cash de regalos que queda en mano y el saldo de Unicaja (regalos por banco + cash
   // ingresado − lo que Unicaja ha pagado; si es negativo, es deuda). Los regalos «directo al proveedor» no entran en
-  // ninguna bolsa, y lo que pagan quienes aportan (NO_DEVOLVER) no se devuelve. Quien pagó de su bolsillo (Jose,
+  // ninguna bolsa, y lo que pagan B2B Tinkkers o un regalo directo no se devuelve. Quien pagó de su bolsillo (Jose,
   // Oarda…) tiene que cobrarlo. Primero se tapa la deuda de Unicaja con cash; luego se devuelve a cada persona, con el cash que
   // quede y después desde Unicaja. Si no llega para todos, a cada uno se le devuelve la misma proporción.
   function liquidacion(C){
     const rc = C.regMet.cash || 0, rb = C.regMet.banco || 0;
-    const cashMano = rc - (C.pagador[GIFT_CASH] || 0) - C.traspasos;
+    const cashMano = rc - (C.regDe[CASH_REGALOS] || 0) - C.traspasos;
     const saldoUni = rb + C.traspasos - (C.pagador[UNICAJA] || 0);
-    const sinAsignar = Object.entries(C.pagador).filter(([n]) => n === '—' || /^sin asignar$/i.test(n)).reduce((s, [, v]) => s + v, 0);
-    const noDev = S.ajustes.noDevolver || NO_DEVOLVER;
-    const aportan = Object.entries(C.pagador).filter(([n]) => noDev.includes(n));
-    const personas = Object.entries(C.pagador).filter(([n, v]) => v > 0.005 && ![GIFT_CASH, UNICAJA, '—', ...noDev].includes(n) && !/^sin asignar$/i.test(n)).sort((a, b) => b[1] - a[1]);
+    const sinAsignar = C.pagador[SIN] || 0;
+    const aportan = [...(C.pagador[B2B] ? [[B2B, C.pagador[B2B]]] : []), ...Object.entries(C.regDe).filter(([d]) => d !== CASH_REGALOS)];
+    const personas = Object.entries(C.pagador).filter(([n, v]) => v > 0.005 && ![UNICAJA, REGALOS, B2B, SIN].includes(n)).sort((a, b) => b[1] - a[1]);
     let cash = Math.max(cashMano, 0), uni = Math.max(saldoUni, 0);
     const plan = [];
     const deudaUni = Math.max(-saldoUni, 0);
@@ -728,6 +749,7 @@ form.edit input,form.edit select{background:var(--surface)}
     const a = document.activeElement;
     return !!(a && a !== document.body && S.editing && S.editing.startsWith(col + '/') && a.closest('form.edit'));
   }
+  function pagadorOptions(v){ return `<option value="">${SIN}</option>` + PAGADORES.map(p => `<option value="${esc(p)}"${p === v ? ' selected' : ''}>${esc(p)}</option>`).join(''); }
   function metodoOptions(v){ return `<option value="banco"${v !== 'cash' ? ' selected' : ''}>Banco</option><option value="cash"${v === 'cash' ? ' selected' : ''}>Cash</option>`; }
   function partidaOptions(v){
     return compute().catList.map(c => `<optgroup label="${esc(c.nombre)}">${c.items.map(r =>
@@ -757,7 +779,8 @@ form.edit input,form.edit select{background:var(--surface)}
     {name:'importe', label:'Importe (€)', type:'number'},
     {name:'fecha', label:'Mes (aprox.)', type:'select', options: monthOptions},
     {name:'metodo', label:'Cómo', type:'select', options: metodoOptions},
-    {name:'pagador', label:'Quién paga', list:'pagadores'},
+    {name:'pagador', label:'Quién paga', type:'select', options: pagadorOptions},
+    {name:'regaloDe', label:'De qué regalo (si paga Regalos)', list:'regalosDe'},
     {name:'nota', label:'Nota', span:true},
   ];
   const REG_FIELDS = [
@@ -791,7 +814,7 @@ form.edit input,form.edit select{background:var(--surface)}
   function renderMovs(){
     if (busy('movimientos')) return;
     const fp = $('fltPartida').value, fm = $('fltMetodo').value, fw = $('fltPagador').value;
-    const list = S.movs.filter(m => (!fp || m.partidaId === fp) && (!fm || m.metodo === fm) && (!fw || m.pagador === fw))
+    const list = S.movs.filter(m => (!fp || m.partidaId === fp) && (!fm || m.metodo === fm) && (!fw || (fw === '__none' ? !m.pagador : fw.startsWith(REGALOS + '::') ? m.pagador === REGALOS && (m.regaloDe || 'sin especificar') === fw.slice(REGALOS.length + 2) : m.pagador === fw)))
       .sort((a,b) => (b.creado || '').localeCompare(a.creado || ''));
     if (!list.length) { $('movList').innerHTML = `<div class="empty">${S.movs.length ? 'Ningún movimiento con estos filtros.' : 'Aún no hay movimientos. Apunta el primero con «Nuevo movimiento».'}</div>`; return; }
     const total = list.reduce((s, m) => s + (+m.importe || 0), 0);
@@ -801,7 +824,7 @@ form.edit input,form.edit select{background:var(--surface)}
         const path = 'movimientos/' + m.id;
         if (S.editing === path) return editBlock(path, MOV_FIELDS, true);
         const who = m.creadoPor && !String(m.creadoPor).startsWith('u_') ? `apuntado por ${cap(m.creadoPor)}` : '';
-        const sub = [m.pagador || 'Sin asignar', m.nota, who].filter(Boolean).join(' · ');
+        const sub = [pagLabel(m), m.nota, who].filter(Boolean).join(' · ');
         return `<button class="trow" type="button" data-row="${esc(path)}">
           <span class="tmain"><span class="t">${esc(partidaName(m.partidaId))}</span><span class="s">${esc(sub)}</span></span>
           <span class="tags"><span class="tag ${m.metodo === 'cash' ? 'cash' : 'banco'}">${m.metodo === 'cash' ? 'Cash' : 'Banco'}</span></span>
@@ -889,7 +912,7 @@ form.edit input,form.edit select{background:var(--surface)}
     return '';
   }
   const DIFF = {
-    movimiento: { partidaId: ['partida', v => partidaName(v)], importe: ['importe', v => fmt2(v)], fecha: ['mes', fDate], metodo: ['cómo', metodoTxt], pagador: ['quién paga', v => v || '—'], nota: ['nota', v => v || '—'] },
+    movimiento: { partidaId: ['partida', v => partidaName(v)], importe: ['importe', v => fmt2(v)], fecha: ['mes', fDate], metodo: ['cómo', metodoTxt], pagador: ['quién paga', v => v || SIN], regaloDe: ['de qué regalo', v => v || '—'], nota: ['nota', v => v || '—'] },
     regalo: { de: ['de parte de', v => v || '—'], importe: ['importe', v => fmt2(v)], fecha: ['mes', fDate], metodo: ['cómo', metodoTxt], adultos: ['adultos', v => v ?? '—'], ninos: ['niños', v => v ?? '—'], familia: ['de los padres', v => v ? 'sí' : 'no'], nota: ['nota', v => v || '—'] },
     partida: { nombre: ['nombre', v => v || '—'], categoria: ['categoría', v => v || '—'], proveedor: ['proveedor', v => v || '—'], previsto: ['previsto', v => fmt(v)], final: ['precio final', v => v == null || v === '' ? 'sin cerrar' : fmt(v)], abierta: ['gasto abierto', v => v ? 'sí' : 'no'], notas: ['notas', v => v || '—'], pago: ['forma de pago', v => ({ cash: 'cash', banco: 'banco', mixto: 'mixto' })[v] || 'según los pagos'] },
   };
@@ -948,9 +971,14 @@ form.edit input,form.edit select{background:var(--surface)}
     $('fltPartida').innerHTML = `<option value="">Todas</option>` + C.catList.map(c =>
       `<optgroup label="${esc(c.nombre)}">${c.items.map(r => `<option value="${esc(r.id)}">${esc(r.nombre)}</option>`).join('')}</optgroup>`).join('');
     $('fltPartida').value = keepF;
-    const payers = [...new Set([...(S.ajustes.pagadores || []), ...S.movs.map(m => m.pagador).filter(Boolean)])];
-    $('pagadores').innerHTML = payers.map(p => `<option value="${esc(p)}"></option>`).join('');
-    $('fltPagador').innerHTML = `<option value="">Todos</option>` + payers.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('');
+    const keepM = $('mPagador').value;
+    $('mPagador').innerHTML = `<option value="">Elige quién paga…</option>` + PAGADORES.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('');
+    $('mPagador').value = keepM;
+    const desde = [...new Set([CASH_REGALOS, ...S.movs.map(m => m.regaloDe).filter(Boolean), ...S.regalos.map(r => r.de).filter(Boolean)])];
+    $('regalosDe').innerHTML = desde.map(p => `<option value="${esc(p)}"></option>`).join('');
+    $('fltPagador').innerHTML = `<option value="">Todos</option>` + PAGADORES.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('') +
+      Object.keys(C.regDe).sort().map(d => `<option value="${esc(REGALOS + '::' + d)}">${esc(REGALOS)} · ${esc(d)}</option>`).join('') +
+      `<option value="__none">${SIN}</option>`;
     $('fltPagador').value = keepW;
     const cats = [...new Set([...(S.ajustes.categorias || []), ...S.partidas.map(p => p.categoria).filter(Boolean)])];
     $('categorias').innerHTML = cats.map(c => `<option value="${esc(c)}"></option>`).join('');
@@ -981,16 +1009,20 @@ form.edit input,form.edit select{background:var(--surface)}
     if (!db) return flash('mMsg', 'Sin conexión con la base de datos.');
     const importe = amount($('mImporte').value);
     if (!$('mPartida').value || !(importe > 0)) return flash('mMsg', 'Elige una partida y pon un importe mayor que cero.');
+    const pagador = $('mPagador').value, regaloDe = pagador === REGALOS ? $('mRegaloDe').value.trim() : '';
+    if (pagador === REGALOS && !regaloDe) return flash('mMsg', 'Di de qué regalo sale el pago (por ejemplo, Cash de regalos).');
     try {
       await db.collection('movimientos').add({ fecha: $('mFecha').value || null, partidaId: $('mPartida').value, importe,
-        metodo: document.querySelector('input[name=mMetodo]:checked').value, pagador: $('mPagador').value.trim(), nota: $('mNota').value.trim(),
+        metodo: document.querySelector('input[name=mMetodo]:checked').value, pagador, regaloDe, nota: $('mNota').value.trim(),
         creado: new Date().toISOString(), creadoPor: S.uid });
-      const met = document.querySelector('input[name=mMetodo]:checked').value, pg = $('mPagador').value.trim();
-      log('añadió', 'movimiento', `${fmt2(importe)} en ${partidaName($('mPartida').value)}`, [metodoTxt(met), pg && `paga ${pg}`, $('mNota').value.trim()].filter(Boolean).join(' · '));
+      const met = document.querySelector('input[name=mMetodo]:checked').value;
+      log('añadió', 'movimiento', `${fmt2(importe)} en ${partidaName($('mPartida').value)}`, [metodoTxt(met), `paga ${pagLabel({ pagador, regaloDe })}`, $('mNota').value.trim()].filter(Boolean).join(' · '));
       $('mImporte').value = ''; $('mNota').value = '';
       flash('mMsg', `Apuntado: ${fmt2(importe)} en ${partidaName($('mPartida').value)}.`);
     } catch(err) { flash('mMsg', errText(err)); }
   });
+
+  $('mPagador').addEventListener('change', () => { $('mRegaloWrap').hidden = $('mPagador').value !== REGALOS; });
 
   $('fReg').addEventListener('submit', async e => {
     e.preventDefault();
@@ -1063,8 +1095,10 @@ form.edit input,form.edit select{background:var(--surface)}
     const txt = k => String(d[k] ?? '').trim();
     let upd;
     if (col === 'movimientos') {
-      upd = { fecha: d.fecha || null, partidaId: d.partidaId, importe: num('importe'), metodo: d.metodo === 'cash' ? 'cash' : 'banco', pagador: txt('pagador'), nota: txt('nota') };
+      upd = { fecha: d.fecha || null, partidaId: d.partidaId, importe: num('importe'), metodo: d.metodo === 'cash' ? 'cash' : 'banco', pagador: PAGADORES.includes(d.pagador) ? d.pagador : '', nota: txt('nota') };
+      upd.regaloDe = upd.pagador === REGALOS ? txt('regaloDe') : '';
       if (!upd.partidaId || !(upd.importe > 0)) return say('Elige una partida y pon un importe mayor que cero.');
+      if (upd.pagador === REGALOS && !upd.regaloDe) return say('Di de qué regalo sale el pago (por ejemplo, Cash de regalos).');
     } else if (col === 'regalos') {
       upd = { fecha: d.fecha || null, de: txt('de'), importe: num('importe'), metodo: ['cash', 'directo'].includes(d.metodo) ? d.metodo : 'banco', nota: txt('nota'), adultos: intOrNull(d.adultos), ninos: intOrNull(d.ninos), familia: String(d.familia) === 'true' };
       if (!upd.de || !(upd.importe > 0)) return say('Pon de quién es y un importe mayor que cero.');
@@ -1097,6 +1131,8 @@ form.edit input,form.edit select{background:var(--surface)}
       setTimeout(() => { const el = document.querySelector('form.edit input, form.edit select'); if (el) { el.focus({ preventScroll: true }); el.closest('.editing').scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } }, 0);
       return;
     }
+    const pg = e.target.closest('[data-pagador]');
+    if (pg) { showTab('movs'); $('fltPartida').value = ''; $('fltMetodo').value = ''; $('fltPagador').value = pg.dataset.pagador; renderMovs(); return; }
     const tog = e.target.closest('[data-toggle]');
     if (tog) { const n = tog.dataset.toggle; S.collapsed.has(n) ? S.collapsed.delete(n) : S.collapsed.add(n); saveCollapsed(); render(); return; }
     const go = e.target.closest('[data-goto]');
@@ -1181,7 +1217,7 @@ form.edit input,form.edit select{background:var(--surface)}
     const onErr = e => setSync('off', e && e.code === 'permission-denied' ? 'Sin acceso a los datos' : 'Conexión perdida');
     const live = () => setSync('live', 'En directo');
     unsubs.push(db.collection('partidas').onSnapshot(s => { S.partidas = s.docs.map(d => ({ id: d.id, ...d.data() })); S.loaded.p = true; live(); render(); }, onErr));
-    unsubs.push(db.collection('movimientos').onSnapshot(s => { S.movs = s.docs.map(d => ({ id: d.id, ...d.data() })); S.loaded.m = true; render(); }, onErr));
+    unsubs.push(db.collection('movimientos').onSnapshot(s => { S.movs = s.docs.map(d => normPag({ id: d.id, ...d.data() })); S.loaded.m = true; render(); }, onErr));
     unsubs.push(db.collection('regalos').onSnapshot(s => { S.regalos = s.docs.map(d => ({ id: d.id, ...d.data() })); S.loaded.r = true; render(); }, onErr));
     unsubs.push(db.collection('traspasos').onSnapshot(s => { S.tras = s.docs.map(d => ({ id: d.id, ...d.data() })); render(); }, onErr));
     unsubs.push(db.collection('historial').orderBy('cuando', 'desc').limit(300).onSnapshot(s => { S.hist = s.docs.map(d => ({ id: d.id, ...d.data() })); renderFeed(); }, () => {}));
@@ -1199,13 +1235,19 @@ form.edit input,form.edit select{background:var(--surface)}
         creado: new Date().toISOString(), creadoPor: S.uid });
       b.update(db.doc('regalos/r03'), { metodo: 'directo' });
     } },
+    { id: '2026-11-15-pagadores', texto: 'los pagadores: solo Jose, Oarda, Unicaja, B2B Tinkkers o Regalos (con de qué regalo sale)', run: async b => {
+      (await db.collection('movimientos').get()).docs.forEach(doc => {
+        const m = doc.data(), n = normPag(m);
+        if (n.pagador !== (m.pagador || '') || n.regaloDe !== (m.regaloDe || '')) b.update(doc.ref, { pagador: n.pagador, regaloDe: n.regaloDe });
+      });
+    } },
   ];
   async function migrar(){
     try {
       const ref = db.doc('ajustes/migraciones'), hechas = (await ref.get()).data() || {};
       for (const m of MIGRACIONES) {
         if (hechas[m.id]) continue;
-        const b = db.batch(); m.run(b);
+        const b = db.batch(); await m.run(b);
         b.set(ref, { [m.id]: { cuando: new Date().toISOString(), quien: S.uid } }, { merge: true });
         await b.commit();
         log('aplicó', 'cambios', m.texto);
@@ -1251,7 +1293,7 @@ form.edit input,form.edit select{background:var(--surface)}
   if (/[?&]demo\b/.test(location.search)) {
     fetch('demo.json').then(r => r.json()).then(data => {
       const toArr = o => Object.entries(o || {}).map(([id, v]) => ({ id, ...v }));
-      S.partidas = toArr(data.partidas); S.movs = toArr(data.movimientos); S.regalos = toArr(data.regalos); S.tras = toArr(data.traspasos); S.ajustes = (data.ajustes || {}).general || {}; S.hist = toArr(data.historial).sort((a, b) => b.cuando.localeCompare(a.cuando));
+      S.partidas = toArr(data.partidas); S.movs = toArr(data.movimientos).map(normPag); S.regalos = toArr(data.regalos); S.tras = toArr(data.traspasos); S.ajustes = (data.ajustes || {}).general || {}; S.hist = toArr(data.historial).sort((a, b) => b.cuando.localeCompare(a.cuando));
       S.loaded = { p:true, m:true, r:true }; S.uid = 'demo';
       $('login').hidden = true; $('app').hidden = false; setSync('live', 'Vista previa'); render();
     });
